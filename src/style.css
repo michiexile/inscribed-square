@@ -17,3 +17,66 @@ body {
   -webkit-user-select: none;
   -webkit-touch-callout: none;
 }
+
+#bar {
+  position: fixed;
+  top: max(8px, env(safe-area-inset-top));
+  left: 8px;
+  right: 8px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  pointer-events: none;
+}
+
+#bar button {
+  pointer-events: auto;
+  font:
+    600 14px/1 system-ui,
+    sans-serif;
+  color: #e0e6eb;
+  background: #1d252c;
+  border: 1px solid #3a4651;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+#bar button[aria-pressed='true'] {
+  background: #3b2f52;
+  border-color: #c8a0ff;
+}
+
+#hud {
+  position: fixed;
+  left: 8px;
+  right: 8px;
+  bottom: max(8px, env(safe-area-inset-bottom));
+  font:
+    13px/1.3 system-ui,
+    sans-serif;
+  color: #aab4bd;
+  pointer-events: none;
+  text-align: center;
+}
+
+.bench {
+  font:
+    15px/1.4 system-ui,
+    sans-serif;
+  color: #e0e6eb;
+  padding: 16px;
+  overflow: auto;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.bench table {
+  border-collapse: collapse;
+}
+
+.bench th,
+.bench td {
+  padding: 4px 10px;
+  text-align: right;
+  border-bottom: 1px solid #3a4651;
+}
