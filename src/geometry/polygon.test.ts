@@ -51,3 +51,13 @@ describe('Polygon', () => {
     ).toThrow();
   });
 });
+
+describe('Polygon.tangent', () => {
+  it('is the unit direction of travel along the edge holding the parameter', () => {
+    // The unit square runs (0,0) → (1,0) → (1,1) → (0,1): counter-clockwise.
+    expect(unitSquare.tangent(0.1)).toEqual({ x: 1, y: 0 });
+    expect(unitSquare.tangent(0.3)).toEqual({ x: 0, y: 1 });
+    expect(unitSquare.tangent(0.6)).toEqual({ x: -1, y: 0 });
+    expect(unitSquare.tangent(-0.1)).toEqual({ x: 0, y: -1 });
+  });
+});

@@ -9,7 +9,11 @@ npm ci
 npm run dev      # dev server, reachable from a phone on the same network
 npm run check    # typecheck, lint, tests and build: what CI runs
 npm run format   # apply Prettier
+npm run bench    # time the solver in Node
 ```
+
+Open the game with `?bench` (for example `https://michiexile.github.io/inscribed-square/?bench`) to time the solver
+on a phone.
 
 ## Workflow
 

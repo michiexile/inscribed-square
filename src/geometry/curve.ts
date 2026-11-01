@@ -16,6 +16,11 @@ export interface ClosedCurve {
   /** Total length. */
   readonly length: number;
   point(s: number): Vec;
+  /**
+   * Unit tangent in the direction of increasing parameter. Since the parameter is arc length scaled to [0, 1),
+   * the derivative of `point` is `length` times this. Where the curve has a corner, this is the outgoing direction.
+   */
+  tangent(s: number): Vec;
   nearest(p: Vec): Nearest;
 }
 

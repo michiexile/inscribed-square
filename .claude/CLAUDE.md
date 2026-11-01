@@ -37,7 +37,15 @@ Capacitor, Steam with Electron or Tauri (plan doc: https://claude.ai/artifact/Cq
 - `src/geometry/`: pure geometry with no DOM access. Every curve implements `ClosedCurve` (`curve.ts`: arc-length
   parameter in [0, 1), `point`, `nearest`), so the solver never depends on whether a curve is a polygon or a spline.
 - `src/input/`: touch handling. `ThumbTracker` gives each thumb a fixed slot until it lifts.
-- `src/main.ts`: canvas setup, drawing and event wiring; keep logic out of it so it stays testable.
+- `src/geometry/solver.ts`: crude solver (grid over the (s, t) torus + Newton). Squares smaller than `minSide` are
+  rejected, since collapsed squares along s = t have zero error; each square is reported once, not once per starting
+  corner. It can miss squares closer than the grid spacing (#6). A full solve does not fit a frame; it runs once per
+  curve (`.claude/WORKLOG-solver.md`, #3).
+- `src/geometry/square.ts` (control 1) and `centre.ts` (control 2) build the held square; `src/game/hunt.ts` matches
+  held squares against the solver's.
+- `src/main.ts` routes to the game (`src/app.ts`: canvas setup, drawing and event wiring) or the `?bench` page;
+  keep logic out of `app.ts` so it stays testable.
+- `Polygon.nearest` is the hot loop of every solver; keep it allocation-free (`.claude/WORKLOG-solver.md`).
 - Level curves must be generic: symmetric curves inscribe continuous families of squares (#2), and polygon parity
   is unverified (#1).
 
