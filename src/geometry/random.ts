@@ -14,15 +14,15 @@ export function rng(seed: number): () => number {
 }
 
 /**
- * A random star-shaped curve from harmonics 2 to 5, each with amplitude in [0.02, 0.14] and a random phase.
- * Every harmonic is present, so no rotational symmetry survives and the curve is generic.
+ * A random star-shaped curve r(θ) = 1 + Σ a_k cos(kθ + φ_k) over harmonics 2 to 7. Raw amplitudes are random,
+ * then scaled so they sum to between 0.55 and 0.85: high enough that the curve always has dents, below the
+ * limit of 1 that keeps it simple. Every harmonic is present, so no rotational symmetry survives.
  */
-export function randomCurve(seed: number, vertices = 240): Polygon & { harmonics: readonly Harmonic[] } {
+export function randomCurve(seed: number, vertices = 360): Polygon & { harmonics: readonly Harmonic[] } {
   const next = rng(seed);
-  const harmonics = [2, 3, 4, 5].map((k) => ({
-    k,
-    amplitude: 0.02 + 0.12 * next(),
-    phase: 2 * Math.PI * next(),
-  }));
+  const raw = [2, 3, 4, 5, 6, 7].map((k) => ({ k, amplitude: 0.2 + next(), phase: 2 * Math.PI * next() }));
+  const total = 0.55 + 0.3 * next();
+  const sum = raw.reduce((acc, h) => acc + h.amplitude, 0);
+  const harmonics = raw.map((h) => ({ ...h, amplitude: (h.amplitude * total) / sum }));
   return Object.assign(radialFourier(harmonics, vertices), { harmonics });
 }
