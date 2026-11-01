@@ -3,7 +3,7 @@ import { type CentreFit, fitSquareAtCentre } from './geometry/centre';
 import { radialFourier } from './geometry/fourier';
 import type { Polygon } from './geometry/polygon';
 import { randomCurve } from './geometry/random';
-import { findSquares } from './geometry/solver';
+import { type InscribedSquare, findSquares } from './geometry/solver';
 import { type Corners, bestEdgeSquare } from './geometry/square';
 import type { Vec } from './geometry/vec';
 import { ThumbTracker } from './input/pointers';
@@ -17,8 +17,11 @@ if (!canvas || !hud || !modeButton || !newButton || !revealButton) throw new Err
 const ctx = canvas.getContext('2d');
 if (!ctx) throw new Error('2D canvas not supported');
 
-/** Largest corner distance from the curve that counts as inscribed, in curve units (the curve is about 2 wide). */
-const TOLERANCE = 0.03;
+/**
+ * Largest corner distance from the curve at which a held square snaps onto a nearby inscribed square, in curve units
+ * (the curve is about 2 wide). The snap only happens when refinement finds a real square, so near-misses never count.
+ */
+const TOLERANCE = 0.05;
 
 type Mode = 'corners' | 'centre';
 const MODE_LABELS: Record<Mode, string> = { corners: 'Two corners', centre: 'Drag centre' };
@@ -38,7 +41,7 @@ let mode: Mode = 'corners';
 let reveal = false;
 let curve: Polygon = defaultCurve();
 let seed: number | null = null;
-let hunt = new Hunt([], TOLERANCE);
+let hunt = new Hunt(curve, [], TOLERANCE);
 let solveMs = 0;
 let lastFit: CentreFit | undefined;
 let lastFound = 0;
@@ -47,7 +50,7 @@ function loadCurve(newSeed: number | null): void {
   seed = newSeed;
   curve = newSeed === null ? defaultCurve() : randomCurve(newSeed);
   const t0 = performance.now();
-  hunt = new Hunt(findSquares(curve), TOLERANCE);
+  hunt = new Hunt(curve, findSquares(curve), TOLERANCE);
   solveMs = performance.now() - t0;
   lastFit = undefined;
   history.replaceState(null, '', newSeed === null ? location.pathname : `#${newSeed}`);
@@ -109,16 +112,30 @@ function dot(p: Vec, r: number, colour: string): void {
   ctx!.fill();
 }
 
-/** Draws a held square: outline, free corners coloured by distance, and a tether from each to the curve. */
-function drawHeld(corners: Corners, free: readonly number[], toScreen: (p: Vec) => Vec, error: number): void {
-  const inscribed = error <= TOLERANCE;
-  polygonPath(corners, toScreen);
-  if (inscribed) {
-    ctx!.fillStyle = 'rgba(102, 220, 120, 0.25)';
+/**
+ * Draws a held square. Snapped onto an inscribed square, it is drawn as that exact square, filled. Otherwise it shows
+ * its outline, with free corners coloured by distance and tethered to their nearest curve points.
+ */
+function drawHeld(
+  corners: Corners,
+  free: readonly number[],
+  toScreen: (p: Vec) => Vec,
+  error: number,
+  snapped: InscribedSquare | null,
+): void {
+  if (snapped) {
+    polygonPath(snapped.corners, toScreen);
+    ctx!.fillStyle = 'rgba(102, 220, 120, 0.3)';
     ctx!.fill();
+    ctx!.strokeStyle = closeness(0);
+    ctx!.lineWidth = 3;
+    ctx!.stroke();
+    for (const c of snapped.corners) dot(toScreen(c), 6, closeness(0));
+    return;
   }
+  polygonPath(corners, toScreen);
   ctx!.strokeStyle = closeness(error);
-  ctx!.lineWidth = inscribed ? 3 : 2;
+  ctx!.lineWidth = 2;
   ctx!.stroke();
   for (const k of free) {
     const c = corners[k];
@@ -164,13 +181,14 @@ function draw(): void {
 
   const ts = thumbs.thumbs();
   let error: number | null = null;
+  let snapped: InscribedSquare | null = null;
   if (mode === 'corners') {
     const params = ts.map((t) => (t ? curve.nearest(toCurve(t)).s : null));
     if (params[0] !== null && params[1] !== null) {
       const sq = bestEdgeSquare(curve, params[0], params[1]);
       error = sq.error;
-      hunt.check(sq.corners, sq.error);
-      drawHeld(sq.corners, [2, 3], toScreen, sq.error);
+      snapped = hunt.check(sq.corners, sq.error);
+      drawHeld(sq.corners, [2, 3], toScreen, sq.error, snapped);
     }
     ts.forEach((t, i) => {
       if (!t) return;
@@ -193,8 +211,8 @@ function draw(): void {
     if (t) {
       lastFit = fitSquareAtCentre(curve, toCurve(t), lastFit);
       error = lastFit.error;
-      hunt.check(lastFit.corners, lastFit.error);
-      drawHeld(lastFit.corners, [0, 1, 2, 3], toScreen, lastFit.error);
+      snapped = hunt.check(lastFit.corners, lastFit.error);
+      drawHeld(lastFit.corners, [0, 1, 2, 3], toScreen, lastFit.error, snapped);
       ctx!.strokeStyle = THUMB_COLOURS[0];
       ctx!.lineWidth = 2;
       ctx!.beginPath();
@@ -209,7 +227,7 @@ function draw(): void {
   if (hunt.found.length > lastFound) navigator.vibrate?.(40);
   lastFound = hunt.found.length;
   const extra = hunt.extra > 0 ? ` (${hunt.extra} the solver missed)` : '';
-  const err = error === null ? '' : ` · error ${error.toFixed(3)}${error <= TOLERANCE ? ' ✓' : ''}`;
+  const err = error === null ? '' : ` · error ${error.toFixed(3)}${snapped ? ' ✓' : ''}`;
   hud!.textContent =
     `Found ${hunt.found.length} of ${hunt.squares.length}${extra}${err}` +
     ` · curve ${seed ?? 'default'} · solved in ${solveMs.toFixed(0)} ms`;
