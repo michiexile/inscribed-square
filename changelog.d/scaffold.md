@@ -1,0 +1,1 @@
+- First playable build: a closed curve on screen, with up to two thumbs each picking the nearest point on the curve.
