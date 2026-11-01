@@ -12,7 +12,7 @@ A game based on Toeplitz's inscribed square problem.
 
 ## Working stance
 
-- Tests first: write the *discriminating* spec — one the plausible wrong answer fails — before the implementation.
+- Tests first: write the _discriminating_ spec — one the plausible wrong answer fails — before the implementation.
 
 ## Git & Pull Request Guidelines
 
@@ -31,13 +31,23 @@ A game based on Toeplitz's inscribed square problem.
 
 ## Architecture
 
+TypeScript, Vite, HTML canvas; Vitest for tests; ESLint and Prettier. Mobile builds will wrap the web app with
+Capacitor, Steam with Electron or Tauri (plan doc: https://claude.ai/artifact/CqdHHDvThUbNKJiYkcmq2t).
+
+- `src/geometry/`: pure geometry with no DOM access. Every curve implements `ClosedCurve` (`curve.ts`: arc-length
+  parameter in [0, 1), `point`, `nearest`), so the solver never depends on whether a curve is a polygon or a spline.
+- `src/input/`: touch handling. `ThumbTracker` gives each thumb a fixed slot until it lifts.
+- `src/main.ts`: canvas setup, drawing and event wiring; keep logic out of it so it stays testable.
+- Level curves must be generic: symmetric curves inscribe continuous families of squares (#2), and polygon parity
+  is unverified (#1).
+
 ## Subsystem notes (`.claude/rules/`)
 
 Detail for one subsystem lives in a path-scoped rule file that loads when you read a file in its area. Read the matching
 file before changing that subsystem; this table is the index, in case a rule did not load.
 
 | file | covers | loads for |
-|---|---|---|
+| ---- | ------ | --------- |
 
 ## Session practices
 
@@ -61,12 +71,11 @@ file before changing that subsystem; this table is the index, in case a rule did
 - **Open items are GitHub issues** (project lead, 2026-10-11; labels and workflow in `CONTRIBUTING.md`): a question,
   limitation or unverified claim a session leaves gets an issue, linked from its worklog and PR; a user-visible change
   gets a `changelog.d/<topic>.md` fragment, never a `CHANGELOG.md` line (PRs that add to it conflict and drop out of the
-  merge queue; `changelog.d/README.md`, `WORKLOG-changelog-fragments.md`).
+  merge queue; `changelog.d/README.md`).
 - A cloud session (working on its own `claude/...` branch) may commit and push its own work to that branch at
   will, without asking first — the branch is disposable/session-scoped, not shared history. A local/interactive
   session working directly on a shared branch still waits to be asked; the project lead commits that work.
 - **Driving a PR to green** (CI jobs and their local equivalents, how proactive to be): `.claude/skills/steward/SKILL.md`.
-
 
 ## Collaboration preferences
 
