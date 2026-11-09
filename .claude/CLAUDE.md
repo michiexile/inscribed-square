@@ -43,7 +43,8 @@ Capacitor, Steam with Electron or Tauri (plan doc: https://claude.ai/artifact/Cq
   curve (`.claude/WORKLOG-solver.md`, #3).
 - `src/geometry/square.ts` (control 1) and `centre.ts` (control 2) build the held square; `src/game/hunt.ts` counts a
   held square only after Newton refinement confirms a real inscribed square near it, because a within-tolerance held
-  square can be a near-miss (`.claude/WORKLOG-playtest-1.md`).
+  square can be a near-miss (`.claude/WORKLOG-playtest-1.md`), and only after a dwell on that square, so scrubbing
+  does not collect squares (`.claude/WORKLOG-dwell.md`).
 - `src/main.ts` routes to the game (`src/app.ts`: canvas setup, drawing and event wiring) or the `?bench` page;
   keep logic out of `app.ts` so it stays testable.
 - `Polygon.nearest` is the hot loop of every solver; keep it allocation-free (`.claude/WORKLOG-solver.md`).

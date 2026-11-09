@@ -14,6 +14,14 @@ const tri = new Polygon([
 ]);
 const squares = findSquares(tri);
 const TOL = 0.05;
+const DWELL = 400;
+
+/** Holds a square steady for the whole dwell; returns the square it counted as, or null. */
+function holdSteady(hunt: Hunt, corners: Corners, error: number) {
+  hunt.hold(corners, error, 1000);
+  const h = hunt.hold(corners, error, 1000 + DWELL);
+  return h.progress >= 1 ? h.square : null;
+}
 const rotated = (c: Corners, k: number): Corners => [
   c[k % 4],
   c[(k + 1) % 4],
@@ -28,31 +36,31 @@ function nearlyHeld(target: (typeof squares)[number], nudge: number) {
 
 describe('Hunt', () => {
   it('counts a held square within tolerance as the exact solver square it refines to', () => {
-    const hunt = new Hunt(tri, squares, TOL);
+    const hunt = new Hunt(tri, squares, TOL, DWELL);
     const held = nearlyHeld(squares[1], 0.002);
     expect(held.error).toBeGreaterThan(1e-4);
     expect(held.error).toBeLessThan(TOL);
-    expect(hunt.check(held.corners, held.error)).toBe(squares[1]);
+    expect(holdSteady(hunt, held.corners, held.error)).toBe(squares[1]);
     expect(hunt.found).toEqual([squares[1]]);
   });
 
   it('matches whichever corner the held square starts from', () => {
-    const hunt = new Hunt(tri, squares, TOL);
-    expect(hunt.check(rotated(squares[2].corners, 3), 0)).toBe(squares[2]);
+    const hunt = new Hunt(tri, squares, TOL, DWELL);
+    expect(holdSteady(hunt, rotated(squares[2].corners, 3), 0)).toBe(squares[2]);
   });
 
   it('ignores a square whose error is above the tolerance', () => {
-    const hunt = new Hunt(tri, squares, TOL);
+    const hunt = new Hunt(tri, squares, TOL, DWELL);
     const held = nearlyHeld(squares[0], 0.05);
     expect(held.error).toBeGreaterThan(TOL);
-    expect(hunt.check(held.corners, held.error)).toBeNull();
+    expect(holdSteady(hunt, held.corners, held.error)).toBeNull();
     expect(hunt.found).toEqual([]);
   });
 
   it('counts each square once however often it is held', () => {
-    const hunt = new Hunt(tri, squares, TOL);
-    hunt.check(squares[0].corners, 0);
-    hunt.check(rotated(squares[0].corners, 1), 0);
+    const hunt = new Hunt(tri, squares, TOL, DWELL);
+    holdSteady(hunt, squares[0].corners, 0);
+    holdSteady(hunt, rotated(squares[0].corners, 1), 0);
     expect(hunt.found).toHaveLength(1);
   });
 
@@ -68,18 +76,47 @@ describe('Hunt', () => {
       ],
       240,
     );
-    const hunt = new Hunt(curve, findSquares(curve), TOL);
+    const hunt = new Hunt(curve, findSquares(curve), TOL, DWELL);
     const fit = fitSquareAtCentre(curve, { x: 0.059, y: -0.1448 });
     expect(fit.error).toBeLessThan(TOL);
-    expect(hunt.check(fit.corners, fit.error)).toBeNull();
+    expect(holdSteady(hunt, fit.corners, fit.error)).toBeNull();
     expect(hunt.found).toEqual([]);
   });
 
   it('still counts a real square the solver missed, and says so', () => {
-    const hunt = new Hunt(tri, [], TOL);
-    const counted = hunt.check(squares[0].corners, 0);
+    const hunt = new Hunt(tri, [], TOL, DWELL);
+    const counted = holdSteady(hunt, squares[0].corners, 0);
     expect(counted).not.toBeNull();
     expect(dist(counted!.centre, squares[0].centre)).toBeLessThan(1e-6);
     expect(hunt.extra).toBe(1);
+  });
+
+  it('does not count a square swept through without stopping', () => {
+    // Scrubbing the centre across the screen passes over every square for a frame or two.
+    const hunt = new Hunt(tri, squares, TOL, DWELL);
+    const off = nearlyHeld(squares[0], 0.05);
+    for (let t = 0; t < 2000; t += 16) {
+      const on = Math.floor(t / 16) % 10 < 3;
+      const held = on ? squares[0].corners : off.corners;
+      hunt.hold(held, on ? 0 : off.error, t);
+    }
+    expect(hunt.found).toEqual([]);
+  });
+
+  it('counts a square held steadily for the dwell, reporting progress on the way', () => {
+    const hunt = new Hunt(tri, squares, TOL, DWELL);
+    expect(hunt.hold(squares[0].corners, 0, 0)).toEqual({ square: squares[0], progress: 0 });
+    expect(hunt.hold(squares[0].corners, 0, DWELL / 2).progress).toBeCloseTo(0.5);
+    expect(hunt.found).toEqual([]);
+    expect(hunt.hold(squares[0].corners, 0, DWELL).progress).toBe(1);
+    expect(hunt.found).toEqual([squares[0]]);
+  });
+
+  it('restarts the dwell when the hold moves to another square', () => {
+    const hunt = new Hunt(tri, squares, TOL, DWELL);
+    hunt.hold(squares[0].corners, 0, 0);
+    hunt.hold(squares[1].corners, 0, DWELL * 0.9);
+    expect(hunt.hold(squares[1].corners, 0, DWELL * 1.1).progress).toBeLessThan(1);
+    expect(hunt.found).toEqual([]);
   });
 });
