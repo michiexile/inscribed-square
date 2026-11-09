@@ -61,3 +61,32 @@ describe('Polygon.tangent', () => {
     expect(unitSquare.tangent(-0.1)).toEqual({ x: 0, y: -1 });
   });
 });
+
+describe('Polygon.signedDistance', () => {
+  it('is positive inside and negative outside, whichever way the vertices run', () => {
+    const clockwise = new Polygon([...unitSquare.vertices].reverse());
+    for (const poly of [unitSquare, clockwise]) {
+      expect(poly.signedDistance({ x: 0.5, y: 0.9 })).toBeCloseTo(0.1);
+      expect(poly.signedDistance({ x: 0.5, y: -0.3 })).toBeCloseTo(-0.3);
+    }
+  });
+
+  it('gets the sign right where the nearest point is a corner', () => {
+    // Outside a convex corner the nearest point is the corner itself, and the vector to it is not normal to
+    // either edge, so a sign taken from one edge alone can come out wrong here.
+    expect(unitSquare.signedDistance({ x: 1.2, y: 1.05 })).toBeCloseTo(-Math.hypot(0.2, 0.05));
+    expect(unitSquare.signedDistance({ x: 1.05, y: 1.2 })).toBeCloseTo(-Math.hypot(0.2, 0.05));
+    // Inside a reflex corner: an L shape, notch at (1, 1).
+    const ell = new Polygon([
+      { x: 0, y: 0 },
+      { x: 2, y: 0 },
+      { x: 2, y: 1 },
+      { x: 1, y: 1 },
+      { x: 1, y: 2 },
+      { x: 0, y: 2 },
+    ]);
+    expect(ell.signedDistance({ x: 1.2, y: 1.1 })).toBeCloseTo(-0.1);
+    expect(ell.signedDistance({ x: 0.9, y: 0.95 })).toBeCloseTo(Math.hypot(0.1, 0.05));
+    expect(ell.signedDistance({ x: 1.1, y: 1.2 })).toBeCloseTo(-0.1);
+  });
+});

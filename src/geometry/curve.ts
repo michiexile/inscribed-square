@@ -22,6 +22,8 @@ export interface ClosedCurve {
    */
   tangent(s: number): Vec;
   nearest(p: Vec): Nearest;
+  /** Distance from the curve, positive inside it and negative outside. */
+  signedDistance(p: Vec): number;
 }
 
 /** Wraps a parameter into [0, 1). */

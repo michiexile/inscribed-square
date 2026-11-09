@@ -1,5 +1,5 @@
 import type { ClosedCurve } from './curve';
-import { type InscribedSquare, refineFrom } from './solver';
+import { type InscribedSquare, refineFrom, sameSquare } from './solver';
 import { dist } from './vec';
 
 /** A square the tracker is following, under an id that stays the same while the square lives. */
@@ -121,7 +121,7 @@ export class SquareTracker {
   }
 
   private same(a: InscribedSquare, b: InscribedSquare): boolean {
-    return dist(a.centre, b.centre) < 1e-6 && Math.abs(a.side - b.side) < 1e-6;
+    return sameSquare(a, b, 1e-6);
   }
 
   private updateGaps(): void {

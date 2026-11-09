@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { radialFourier } from './fourier';
+import { MorphingCurve } from './morph';
 import { Polygon } from './polygon';
-import { randomCurve } from './random';
-import { findSquares } from './solver';
+import { randomCurve, rng } from './random';
+import { findSquares, isDegenerate } from './solver';
 import { type Vec, dist } from './vec';
 
 /**
@@ -86,5 +87,72 @@ describe('findSquares', () => {
     // A generic smooth curve inscribes an odd number of squares. A solver that misses one, or counts one twice,
     // gets an even number on some of these.
     for (let seed = 1; seed <= 8; seed++) expect(findSquares(randomCurve(seed)).length % 2).toBe(1);
+    // Two of curve 131's three squares differ by about 0.001 in every parameter, an eighth of a grid cell.
+    expect(findSquares(randomCurve(131))).toHaveLength(3);
+  });
+
+  it('finds both squares of a pair just born at a fold, closer together than the grid spacing', () => {
+    // Seed 1 of the morph, just after two folds. Each time two of the squares differ by 0.003 to 0.007 in every
+    // parameter, under one grid cell at the default grid. The grid local-minimum search saw one basin and
+    // returned an even count (6 and 4); even grid 512 missed the first pair.
+    const morph = new MorphingCurve(1);
+    expect(findSquares(morph.at(24.75))).toHaveLength(7);
+    expect(findSquares(morph.at(33.15))).toHaveLength(5);
+  });
+});
+
+/** A regular polygon on the unit circle, turned by `rot`, with each vertex radius scaled by 1 + noise · U(−1, 1). */
+function regular(n: number, noise = 0, seed = 7, rot = 0.1): Polygon {
+  const next = rng(seed);
+  return new Polygon(
+    Array.from({ length: n }, (_, i) => {
+      const r = 1 + noise * (2 * next() - 1);
+      const a = (2 * Math.PI * i) / n + rot;
+      return { x: r * Math.cos(a), y: r * Math.sin(a) };
+    }),
+  );
+}
+
+describe('isDegenerate', () => {
+  it('flags curves with 4-fold symmetry, which inscribe a continuous family of squares', () => {
+    // A circle inscribes a square at every rotation, all with the same centre and side, so a solver that only
+    // dedupes and counts reports a small, even, meaningless number (2 for this 256-gon).
+    for (const curve of [regular(256), regular(8), regular(4)])
+      expect(isDegenerate(curve, findSquares(curve))).toBe(true);
+  });
+
+  it('passes the same shapes after a small random perturbation, which leaves an odd count', () => {
+    // The circle gets a smooth perturbation, as level curves do. Jittering each of its 256 vertices instead breaks
+    // the family into some 40 squares a grid step apart, whose count the solver cannot pin down.
+    const bumpyCircle = radialFourier(
+      [
+        { k: 2, amplitude: 0.02, phase: 0.3 },
+        { k: 3, amplitude: 0.015, phase: 2.1 },
+        { k: 5, amplitude: 0.01, phase: 4 },
+      ],
+      256,
+    );
+    for (const curve of [bumpyCircle, regular(8, 0.02)]) {
+      const squares = findSquares(curve);
+      expect(isDegenerate(curve, squares)).toBe(false);
+      expect(squares.length % 2).toBe(1);
+    }
+  });
+
+  it('passes generic curves, including one with a pair of squares about to fold', () => {
+    // At a fold the Jacobian is singular too, but the squares are isolated: no family runs through them.
+    for (let seed = 1; seed <= 4; seed++)
+      expect(isDegenerate(randomCurve(seed), findSquares(randomCurve(seed)))).toBe(false);
+    const nearFold = new MorphingCurve(1).at(33.15);
+    expect(isDegenerate(nearFold, findSquares(nearFold))).toBe(false);
+  });
+
+  it('passes a hexagon, which is symmetric but not 4-fold, and reports its three squares', () => {
+    // The three are turns of one another by 60°, with the same centre and side: deduping by centre and side alone
+    // merges them into one.
+    const hex = regular(6);
+    const squares = findSquares(hex);
+    expect(squares).toHaveLength(3);
+    expect(isDegenerate(hex, squares)).toBe(false);
   });
 });

@@ -37,10 +37,13 @@ Capacitor, Steam with Electron or Tauri (plan doc: https://claude.ai/artifact/Cq
 - `src/geometry/`: pure geometry with no DOM access. Every curve implements `ClosedCurve` (`curve.ts`: arc-length
   parameter in [0, 1), `point`, `nearest`), so the solver never depends on whether a curve is a polygon or a spline.
 - `src/input/`: touch handling. `ThumbTracker` gives each thumb a fixed slot until it lifts.
-- `src/geometry/solver.ts`: crude solver (grid over the (s, t) torus + Newton). Squares smaller than `minSide` are
-  rejected, since collapsed squares along s = t have zero error; each square is reported once, not once per starting
-  corner. It can miss squares closer than the grid spacing (#6). A full solve does not fit a frame; it runs once per
-  still curve, or in a worker for morphing curves (`.claude/WORKLOG-solver.md`, #3).
+- `src/geometry/solver.ts`: grid over the (s, t) torus + Newton, then a finer search around each square found,
+  zooming in while the count is even, since a pair just born at a fold shares one grid minimum (#6). Squares smaller
+  than `minSide` are rejected, since collapsed squares along s = t have zero error; each square is reported once
+  (`sameSquare` compares a corner as well as centre and side: turned copies on symmetric curves share both). It can
+  still miss pairs under ~1/250 of a grid cell (#6). `isDegenerate` flags continuous families (#2); its Newton step
+  is unexercised on polygons (#16, `.claude/WORKLOG-robust-solver.md`). A full solve does not fit a frame; it runs once
+  per still curve, or in a worker for morphing curves (`.claude/WORKLOG-solver.md`, #3).
 - `src/geometry/tracker.ts` follows squares on a morphing curve (`morph.ts`) frame to frame with `refineFrom`, never
   `refine` (which can switch branch). A square dies when Newton fails or two squares land on the same square; births
   are invisible locally, so `adopt` merges background full solves. Each tracker sub-step is at most 1/60 s
