@@ -7,6 +7,7 @@ import type { Polygon } from '../geometry/polygon';
 import { type InscribedSquare, findSquares } from '../geometry/solver';
 import { SquareTracker } from '../geometry/tracker';
 import type { Renderer } from '../render';
+import { morphStep } from './clock';
 import type { GameMode } from './mode';
 
 /** Two live squares closer than this (centre or side, curve units) are drawn as a fold warning. */
@@ -39,6 +40,8 @@ export class FoldsMode implements GameMode {
 
   constructor(
     readonly seed: number,
+    /** Morph seconds per real second. */
+    private readonly speed: number,
     private readonly tolerance: number,
     private readonly grace: number,
     private readonly label: string,
@@ -66,9 +69,7 @@ export class FoldsMode implements GameMode {
   }
 
   advance(now: number): void {
-    // A long gap (a hidden tab, a stalled frame) advances the morph by at most 0.1 s, so the tracker never has to
-    // bridge a jump it would need thousands of steps for.
-    this.time += Math.min(0.1, Math.max(0, now - (this.last ?? now)) / 1000);
+    this.time += morphStep(now - (this.last ?? now), this.speed);
     this.last = now;
     this.curve = this.curveAt(this.time);
   }

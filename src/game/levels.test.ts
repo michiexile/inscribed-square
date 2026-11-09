@@ -3,7 +3,7 @@ import { MorphingCurve } from '../geometry/morph';
 import { findSquares } from '../geometry/solver';
 import { GRACE_MS, TOLERANCE } from './feel';
 import { LEVELS, fitHuntSeed, levelCurve, parseRoute, routeOf } from './levels';
-import { foldTrace, huntProblems, strandedFolds } from './validate';
+import { foldTrace, foldsProblems, huntProblems } from './validate';
 
 const COUNT_WORDS: Record<string, number> = { Three: 3, Five: 5, Seven: 7, Nine: 9, Eleven: 11 };
 
@@ -58,13 +58,21 @@ describe('levels', () => {
     }
   }, 60_000);
 
-  it('never strands a player in the first minute of an Avoid Folds level', () => {
-    // After every fold, some square is alive within the grace time and lives at least a second after it.
+  it("never strands a player in the first minute of an Avoid Folds level, at the level's own speed", () => {
+    // After every fold, some square is alive within the grace time and lives at least a second after it, both in
+    // real seconds.
     for (const level of LEVELS.filter((l) => l.mode === 'folds')) {
-      const trace = foldTrace(new MorphingCurve(level.seed), 60, 0.5);
-      expect(strandedFolds(trace, GRACE_MS / 1000, 1), level.id!).toEqual([]);
+      const speed = level.speed ?? 1;
+      const trace = foldTrace(new MorphingCurve(level.seed), 60 * speed, 0.5);
+      expect(foldsProblems(trace, speed, GRACE_MS / 1000, 1), level.id!).toEqual([]);
     }
-  }, 120_000);
+  }, 240_000);
+
+  it('makes Avoid Folds faster level by level', () => {
+    const speeds = LEVELS.filter((l) => l.mode === 'folds').map((l) => l.speed ?? 1);
+    expect(speeds[0]).toBe(1);
+    for (let i = 1; i < speeds.length; i++) expect(speeds[i]).toBeGreaterThan(speeds[i - 1]);
+  });
 
   it('moves a random Square Hunt seed on to the next curve that passes validation', () => {
     expect(fitHuntSeed(1)).toBe(1);

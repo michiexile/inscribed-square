@@ -80,3 +80,15 @@ export function huntProblems(
   if (gap < minGap) problems.push(`two squares only ${gap.toFixed(3)} apart`);
   return problems;
 }
+
+/**
+ * Why an Avoid Folds level at morph `speed` can strand the player, from a trace in morph seconds; empty when it
+ * cannot. `grace` and `hold` are in real seconds, so a faster morph needs rescue squares that live longer in morph
+ * time.
+ */
+export function foldsProblems(trace: FoldTrace, speed: number, grace: number, hold: number): string[] {
+  const times = [...new Set(strandedFolds(trace, grace * speed, hold * speed))];
+  return times.map(
+    (t) => `stranded after the fold at ${t.toFixed(1)} s (${(t / speed).toFixed(1)} s real time)`,
+  );
+}

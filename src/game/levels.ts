@@ -22,6 +22,8 @@ export interface Level {
   readonly name: string;
   readonly mode: ModeId;
   readonly seed: number;
+  /** Avoid Folds only: morph seconds per real second. Default 1. Later levels morph faster. */
+  readonly speed?: number;
 }
 
 export const LEVELS: readonly Level[] = [
@@ -30,8 +32,9 @@ export const LEVELS: readonly Level[] = [
   { id: 'hunt-3', name: 'Seven squares', mode: 'hunt', seed: 5 },
   { id: 'hunt-4', name: 'Nine squares', mode: 'hunt', seed: 51 },
   { id: 'folds-1', name: 'Drift', mode: 'folds', seed: 1 },
-  { id: 'folds-2', name: 'Undertow', mode: 'folds', seed: 2 },
-  { id: 'folds-3', name: 'Churn', mode: 'folds', seed: 5 },
+  { id: 'folds-2', name: 'Undertow', mode: 'folds', seed: 2, speed: 1.5 },
+  { id: 'folds-3', name: 'Churn', mode: 'folds', seed: 5, speed: 2 },
+  { id: 'folds-4', name: 'Rapids', mode: 'folds', seed: 3, speed: 3 },
 ];
 
 /** A random curve in the given mode. */

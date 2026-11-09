@@ -60,7 +60,7 @@ function start(next: Level): void {
   game =
     next.mode === 'hunt'
       ? new HuntMode(levelCurve(next), TOLERANCE, DWELL_MS, label)
-      : new FoldsMode(next.seed, TOLERANCE, GRACE_MS, label);
+      : new FoldsMode(next.seed, next.speed ?? 1, TOLERANCE, GRACE_MS, label);
   heldSquare.reset();
   history.replaceState(null, '', routeOf(next));
   menu!.hidden = true;
@@ -97,7 +97,8 @@ function buildMenu(): void {
       b.addEventListener('click', onClick);
       section.append(b);
     };
-    for (const l of LEVELS.filter((l) => l.mode === mode)) add(l.name, () => start(l));
+    for (const l of LEVELS.filter((l) => l.mode === mode))
+      add(l.speed && l.speed !== 1 ? `${l.name} · ${l.speed}× speed` : l.name, () => start(l));
     add('Random curve', () => start(randomLevel(mode, Math.floor(Math.random() * 1e6))));
     menu!.append(section);
   }
