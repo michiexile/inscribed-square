@@ -1,3 +1,4 @@
+import type { Banner } from '../game/banner';
 import type { Held } from '../game/control';
 import type { Polygon } from '../geometry/polygon';
 import type { Renderer } from '../render';
@@ -15,6 +16,10 @@ export interface GameMode {
   frame(r: Renderer, held: Held | null, now: number, reveal: boolean): boolean;
   /** One line of status for the HUD. */
   hud(): string;
+  /** A large message the player must not miss, or null. */
+  banner(): Banner | null;
+  /** Starts the level over, after its banner's button is pressed. */
+  restart(): void;
   /** Called when every thumb has lifted. */
   released(now: number): void;
   /** Frees background work. */

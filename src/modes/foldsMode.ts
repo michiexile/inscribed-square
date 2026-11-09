@@ -1,3 +1,4 @@
+import { type Banner, foldsBanner } from '../game/banner';
 import type { Held } from '../game/control';
 import { AvoidFolds, type FoldsState } from '../game/folds';
 import type { SolveRequest, SolveResult } from '../game/solveWorker';
@@ -136,18 +137,22 @@ export class FoldsMode implements GameMode {
       case 'holding':
         return `${score}${where}`;
       case 'lost':
-        return `Lost it! ${(this.state.graceLeft / 1000).toFixed(1)} s to find another · ${score}`;
+        return `${(this.state.graceLeft / 1000).toFixed(1)} s to find another · ${score}`;
       case 'over':
-        return `Round over: ${score}${best} · lift and touch to play again`;
+        return `Round over: ${score}${best}`;
     }
   }
 
-  released(): void {
-    if (this.state.phase === 'over') {
-      this.game = new AvoidFolds(this.tolerance, this.grace);
-      this.state = { phase: 'searching', square: null, graceLeft: 0 };
-    }
+  banner(): Banner | null {
+    return foldsBanner(this.state, this.game.score, this.game.saves, this.best);
   }
+
+  restart(): void {
+    this.game = new AvoidFolds(this.tolerance, this.grace);
+    this.state = { phase: 'searching', square: null, graceLeft: 0 };
+  }
+
+  released(): void {}
 
   dispose(): void {
     this.worker?.terminate();

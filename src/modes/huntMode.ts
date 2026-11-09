@@ -1,3 +1,4 @@
+import { type Banner, huntBanner } from '../game/banner';
 import type { Held } from '../game/control';
 import { type Hold, Hunt } from '../game/hunt';
 import type { Polygon } from '../geometry/polygon';
@@ -57,6 +58,12 @@ export class HuntMode implements GameMode {
       ` · ${this.label} · solved in ${this.solveMs.toFixed(0)} ms`
     );
   }
+
+  banner(): Banner | null {
+    return huntBanner(this.hunt.found.length, this.hunt.squares.length);
+  }
+
+  restart(): void {}
 
   released(now: number): void {
     this.hunt.hold(null, 0, now);
