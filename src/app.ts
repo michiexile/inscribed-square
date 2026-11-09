@@ -1,10 +1,12 @@
 import type { Banner } from './game/banner';
 import { CONTROL_NAMES, type Control, HeldSquare } from './game/control';
+import { GRACE_MS, TOLERANCE } from './game/feel';
 import {
   LEVELS,
   type Level,
   MODE_NAMES,
   type ModeId,
+  fitHuntSeed,
   levelCurve,
   parseRoute,
   randomLevel,
@@ -31,15 +33,8 @@ if (!canvas || !hud || !banner || !menu || !levelsButton || !controlButton || !n
 const ctx = canvas.getContext('2d');
 if (!ctx) throw new Error('2D canvas not supported');
 
-/**
- * Largest corner distance from the curve at which a held square snaps onto a nearby inscribed square, in curve units
- * (the curve is about 2 wide). The snap only happens onto a real square, so near-misses never count.
- */
-const TOLERANCE = 0.05;
 /** How long a snapped square must be held before it counts in Square Hunt, in milliseconds. */
 const DWELL_MS = 500;
-/** How long Avoid Folds gives the player to find another square after losing theirs, in milliseconds. */
-const GRACE_MS = 3000;
 /**
  * A thumb drives the point this many layout pixels above it, so the thumb doesn't cover the square or the curve near it.
  */
@@ -59,6 +54,7 @@ const heldSquare = new HeldSquare();
 
 function start(next: Level): void {
   game?.dispose();
+  if (next.id === null && next.mode === 'hunt') next = { ...next, seed: fitHuntSeed(next.seed) };
   level = next;
   const label = next.id ? next.name : `random curve ${next.seed}`;
   game =

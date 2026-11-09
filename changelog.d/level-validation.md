@@ -1,0 +1,2 @@
+- The "Nine squares" level has a new curve: on the old one, two of the squares were too close together to tell apart.
+- A random Square Hunt curve now skips curves with squares too close together to tell apart.
