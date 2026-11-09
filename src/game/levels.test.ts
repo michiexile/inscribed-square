@@ -30,7 +30,9 @@ describe('levels', () => {
     for (const level of LEVELS.filter((l) => l.mode === 'folds')) {
       const morph = new MorphingCurve(level.seed!);
       const counts = new Set<number>();
-      for (let time = 0; time <= 20; time += 1) counts.add(findSquares(morph.at(time)).length);
+      // Stop at the first change: one fold is all the test needs, and each full solve costs tens of milliseconds.
+      for (let time = 0; time <= 20 && counts.size < 2; time += 1)
+        counts.add(findSquares(morph.at(time)).length);
       expect(counts.size, level.id!).toBeGreaterThan(1);
     }
   });

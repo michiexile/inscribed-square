@@ -1,3 +1,4 @@
+import type { Banner } from './game/banner';
 import { CONTROL_NAMES, type Control, HeldSquare } from './game/control';
 import {
   LEVELS,
@@ -18,12 +19,13 @@ import { Renderer } from './render';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game');
 const hud = document.querySelector<HTMLElement>('#hud');
+const banner = document.querySelector<HTMLElement>('#banner');
 const menu = document.querySelector<HTMLElement>('#menu');
 const levelsButton = document.querySelector<HTMLButtonElement>('#levels');
 const controlButton = document.querySelector<HTMLButtonElement>('#mode');
 const newButton = document.querySelector<HTMLButtonElement>('#new');
 const revealButton = document.querySelector<HTMLButtonElement>('#reveal');
-if (!canvas || !hud || !menu || !levelsButton || !controlButton || !newButton || !revealButton)
+if (!canvas || !hud || !banner || !menu || !levelsButton || !controlButton || !newButton || !revealButton)
   throw new Error('Missing page elements');
 const ctx = canvas.getContext('2d');
 if (!ctx) throw new Error('2D canvas not supported');
@@ -37,6 +39,10 @@ const TOLERANCE = 0.05;
 const DWELL_MS = 500;
 /** How long Avoid Folds gives the player to find another square after losing theirs, in milliseconds. */
 const GRACE_MS = 3000;
+/**
+ * A thumb drives the point this many CSS pixels above it, so the thumb doesn't cover the square or the curve near it.
+ */
+const GRAB_OFFSET = 80;
 
 let control: Control = 'corners';
 let reveal = false;
@@ -66,6 +72,7 @@ function showMenu(): void {
   history.replaceState(null, '', location.pathname + location.search);
   menu!.hidden = false;
   hud!.textContent = '';
+  showBanner(null);
   ctx!.clearRect(0, 0, canvas!.clientWidth, canvas!.clientHeight);
 }
 
@@ -126,20 +133,53 @@ function draw(now: number): void {
   game.advance(now);
   const curve = game.curve;
   const ts = thumbs.thumbs();
+  const grab = ts.map((t) => (t ? { x: t.x, y: t.y - GRAB_OFFSET } : null));
   const held = heldSquare.update(
     curve,
     control,
-    ts.map((t) => (t ? toCurve(t) : null)),
+    grab.map((g) => (g ? toCurve(g) : null)),
   );
   const r = new Renderer(ctx!, toScreen, TOLERANCE);
   const animate = game.frame(r, held, now, reveal);
   ts.forEach((t, i) => {
     if (!t) return;
-    if (control === 'corners') r.thumb(t, i, curve.nearest(toCurve(t)).point);
-    else if (t === (ts[0] ?? ts[1])) r.thumb(t, 0);
+    const g = grab[i]!;
+    if (control === 'corners') r.thumb(t, i, toScreen(curve.nearest(toCurve(g)).point));
+    else if (t === (ts[0] ?? ts[1])) r.thumb(t, 0, g);
   });
   hud!.textContent = `${MODE_NAMES[level!.mode]} · ${game.hud()}`;
+  showBanner(game.banner());
   if (animate) requestDraw();
+}
+
+let shownBanner = '';
+/** Shows the mode's banner, rebuilding the element only when its content changes. */
+function showBanner(b: Banner | null): void {
+  const key = b ? JSON.stringify(b) : '';
+  if (key === shownBanner) return;
+  shownBanner = key;
+  banner!.hidden = !b;
+  banner!.replaceChildren();
+  if (!b) return;
+  banner!.dataset.tone = b.tone;
+  const title = document.createElement('strong');
+  title.textContent = b.title;
+  banner!.append(title);
+  if (b.detail) {
+    const detail = document.createElement('span');
+    detail.textContent = b.detail;
+    banner!.append(detail);
+  }
+  if (b.action) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = b.action;
+    button.addEventListener('click', () => {
+      game?.restart();
+      requestDraw();
+    });
+    banner!.append(button);
+  }
 }
 
 const pos = (e: PointerEvent): Vec => {

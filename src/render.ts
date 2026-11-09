@@ -101,8 +101,8 @@ export class Renderer {
     }
   }
 
-  /** A thumb's ring, and for the two-corners control a tether to the corner it drives. */
-  thumb(at: Vec, index: number, corner?: Vec): void {
+  /** A thumb's ring and a tether to the point it drives (a corner, or the square's centre), in screen coordinates. */
+  thumb(at: Vec, index: number, target: Vec): void {
     const ctx = this.ctx;
     const colour = THUMB_COLOURS[index];
     ctx.strokeStyle = colour;
@@ -110,11 +110,7 @@ export class Renderer {
     ctx.beginPath();
     ctx.arc(at.x, at.y, 36, 0, 2 * Math.PI);
     ctx.stroke();
-    if (!corner) {
-      this.dot(at, 4, colour);
-      return;
-    }
-    const c = this.toScreen(corner);
+    const c = target;
     ctx.setLineDash([4, 6]);
     ctx.beginPath();
     ctx.moveTo(at.x, at.y);
