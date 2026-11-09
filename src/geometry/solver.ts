@@ -89,9 +89,23 @@ export function refine(
   t0: number,
   maxIterations = 40,
 ): InscribedSquare | null {
-  const L = curve.length;
   const start = squareOnEdge(curve.point(s0), curve.point(t0));
-  let x = [s0, t0, curve.nearest(start[2]).s, curve.nearest(start[3]).s];
+  return refineFrom(curve, [s0, t0, curve.nearest(start[2]).s, curve.nearest(start[3]).s], maxIterations);
+}
+
+/**
+ * Newton's method from a full starting guess (s, t, u, v), such as an inscribed square's parameters on a slightly
+ * different curve. Starting from all four parameters keeps it on the same square where `refine`, which picks u and v
+ * by nearest point, could switch to another. Returns null if it does not converge.
+ */
+export function refineFrom(
+  curve: ClosedCurve,
+  start: readonly [number, number, number, number],
+  maxIterations = 40,
+): InscribedSquare | null {
+  const L = curve.length;
+  // Parameters are not wrapped during the iteration: point and tangent wrap them, so crossing 0 costs nothing.
+  let x = [...start];
 
   const residual = (y: number[]): number[] => {
     const sq = squareOnEdge(curve.point(y[0]), curve.point(y[1]));

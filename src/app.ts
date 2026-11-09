@@ -1,65 +1,93 @@
-import { type Hold, Hunt } from './game/hunt';
-import { type CentreFit, fitSquareAtCentre } from './geometry/centre';
-import { radialFourier } from './geometry/fourier';
-import type { Polygon } from './geometry/polygon';
-import { randomCurve } from './geometry/random';
-import { findSquares } from './geometry/solver';
-import { type Corners, bestEdgeSquare } from './geometry/square';
+import { CONTROL_NAMES, type Control, HeldSquare } from './game/control';
+import {
+  LEVELS,
+  type Level,
+  MODE_NAMES,
+  type ModeId,
+  levelCurve,
+  parseRoute,
+  randomLevel,
+  routeOf,
+} from './game/levels';
 import type { Vec } from './geometry/vec';
 import { ThumbTracker } from './input/pointers';
+import { FoldsMode } from './modes/foldsMode';
+import { HuntMode } from './modes/huntMode';
+import type { GameMode } from './modes/mode';
+import { Renderer } from './render';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game');
 const hud = document.querySelector<HTMLElement>('#hud');
-const modeButton = document.querySelector<HTMLButtonElement>('#mode');
+const menu = document.querySelector<HTMLElement>('#menu');
+const levelsButton = document.querySelector<HTMLButtonElement>('#levels');
+const controlButton = document.querySelector<HTMLButtonElement>('#mode');
 const newButton = document.querySelector<HTMLButtonElement>('#new');
 const revealButton = document.querySelector<HTMLButtonElement>('#reveal');
-if (!canvas || !hud || !modeButton || !newButton || !revealButton) throw new Error('Missing page elements');
+if (!canvas || !hud || !menu || !levelsButton || !controlButton || !newButton || !revealButton)
+  throw new Error('Missing page elements');
 const ctx = canvas.getContext('2d');
 if (!ctx) throw new Error('2D canvas not supported');
 
 /**
  * Largest corner distance from the curve at which a held square snaps onto a nearby inscribed square, in curve units
- * (the curve is about 2 wide). The snap only happens when refinement finds a real square, so near-misses never count.
+ * (the curve is about 2 wide). The snap only happens onto a real square, so near-misses never count.
  */
 const TOLERANCE = 0.05;
-/** How long a snapped square must be held before it counts, in milliseconds, so scrubbing doesn't collect squares. */
+/** How long a snapped square must be held before it counts in Square Hunt, in milliseconds. */
 const DWELL_MS = 500;
+/** How long Avoid Folds gives the player to find another square after losing theirs, in milliseconds. */
+const GRACE_MS = 3000;
 
-type Mode = 'corners' | 'centre';
-const MODE_LABELS: Record<Mode, string> = { corners: 'Two corners', centre: 'Drag centre' };
-
-// The default curve is a fixed, deliberately asymmetric loop; "New curve" draws random ones by seed.
-const defaultCurve = (): Polygon =>
-  radialFourier(
-    [
-      { k: 2, amplitude: 0.18, phase: 0.4 },
-      { k: 3, amplitude: 0.12, phase: 1.9 },
-      { k: 5, amplitude: 0.05, phase: 0.7 },
-    ],
-    240,
-  );
-
-let mode: Mode = 'corners';
+let control: Control = 'corners';
 let reveal = false;
-let curve: Polygon = defaultCurve();
-let seed: number | null = null;
-let hunt = new Hunt(curve, [], TOLERANCE, DWELL_MS);
-let solveMs = 0;
-let lastFit: CentreFit | undefined;
-let lastFound = 0;
+let level: Level | null = null;
+let game: GameMode | null = null;
+const thumbs = new ThumbTracker();
+const heldSquare = new HeldSquare();
 
-function loadCurve(newSeed: number | null): void {
-  seed = newSeed;
-  curve = newSeed === null ? defaultCurve() : randomCurve(newSeed);
-  const t0 = performance.now();
-  hunt = new Hunt(curve, findSquares(curve), TOLERANCE, DWELL_MS);
-  solveMs = performance.now() - t0;
-  lastFit = undefined;
-  history.replaceState(null, '', newSeed === null ? location.pathname : `#${newSeed}`);
+function start(next: Level): void {
+  game?.dispose();
+  level = next;
+  const label = next.id ? next.name : `random curve ${next.seed}`;
+  game =
+    next.mode === 'hunt'
+      ? new HuntMode(levelCurve(next), TOLERANCE, DWELL_MS, label)
+      : new FoldsMode(next.seed, TOLERANCE, GRACE_MS, label);
+  heldSquare.reset();
+  history.replaceState(null, '', routeOf(next));
+  menu!.hidden = true;
+  requestDraw();
 }
 
-const thumbs = new ThumbTracker();
-const THUMB_COLOURS = ['#4fc3f7', '#ffb74d'];
+function showMenu(): void {
+  game?.dispose();
+  game = null;
+  level = null;
+  history.replaceState(null, '', location.pathname + location.search);
+  menu!.hidden = false;
+  hud!.textContent = '';
+  ctx!.clearRect(0, 0, canvas!.clientWidth, canvas!.clientHeight);
+}
+
+function buildMenu(): void {
+  menu!.replaceChildren();
+  for (const mode of ['hunt', 'folds'] as ModeId[]) {
+    const section = document.createElement('section');
+    const heading = document.createElement('h2');
+    heading.textContent = MODE_NAMES[mode];
+    section.append(heading);
+    const add = (text: string, onClick: () => void) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = text;
+      b.addEventListener('click', onClick);
+      section.append(b);
+    };
+    for (const l of LEVELS.filter((l) => l.mode === mode)) add(l.name, () => start(l));
+    add('Random curve', () => start(randomLevel(mode, Math.floor(Math.random() * 1e6))));
+    menu!.append(section);
+  }
+}
 
 /** Maps curve coordinates (roughly [-1.5, 1.5]²) to CSS pixels, centred on the canvas. */
 function view(): { toScreen: (p: Vec) => Vec; toCurve: (p: Vec) => Vec } {
@@ -77,7 +105,7 @@ function resize(): void {
   canvas!.width = Math.round(canvas!.clientWidth * dpr);
   canvas!.height = Math.round(canvas!.clientHeight * dpr);
   ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
-  draw();
+  requestDraw();
 }
 
 let drawPending = false;
@@ -85,168 +113,33 @@ let drawPending = false;
 function requestDraw(): void {
   if (drawPending) return;
   drawPending = true;
-  requestAnimationFrame(() => {
+  requestAnimationFrame((now) => {
     drawPending = false;
-    draw();
+    draw(now);
   });
 }
 
-/** Green when a corner is within tolerance, through yellow, to red at eight times the tolerance. */
-function closeness(d: number): string {
-  const t = Math.min(1, Math.max(0, (d - TOLERANCE) / (7 * TOLERANCE)));
-  return `hsl(${Math.round(120 * (1 - t))}, 85%, 55%)`;
-}
-
-function polygonPath(points: readonly Vec[], toScreen: (p: Vec) => Vec): void {
-  ctx!.beginPath();
-  points.forEach((v, i) => {
-    const p = toScreen(v);
-    if (i === 0) ctx!.moveTo(p.x, p.y);
-    else ctx!.lineTo(p.x, p.y);
-  });
-  ctx!.closePath();
-}
-
-function dot(p: Vec, r: number, colour: string): void {
-  ctx!.fillStyle = colour;
-  ctx!.beginPath();
-  ctx!.arc(p.x, p.y, r, 0, 2 * Math.PI);
-  ctx!.fill();
-}
-
-/**
- * Draws a held square. Snapped onto an inscribed square, it is drawn as that exact square, filled. Otherwise it shows
- * its outline, with free corners coloured by distance and tethered to their nearest curve points.
- */
-function drawHeld(
-  corners: Corners,
-  free: readonly number[],
-  toScreen: (p: Vec) => Vec,
-  error: number,
-  hold: Hold,
-): void {
-  const snapped = hold.square;
-  if (snapped) {
-    // The fill grows with the dwell; a ring round the centre fills up until the square counts.
-    polygonPath(snapped.corners, toScreen);
-    ctx!.fillStyle = `rgba(102, 220, 120, ${0.08 + 0.27 * hold.progress})`;
-    ctx!.fill();
-    ctx!.strokeStyle = closeness(0);
-    ctx!.lineWidth = 3;
-    ctx!.stroke();
-    for (const c of snapped.corners) dot(toScreen(c), 6, closeness(0));
-    if (hold.progress < 1) {
-      const c = toScreen(snapped.centre);
-      ctx!.strokeStyle = closeness(0);
-      ctx!.lineWidth = 4;
-      ctx!.beginPath();
-      ctx!.arc(c.x, c.y, 18, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * hold.progress);
-      ctx!.stroke();
-    }
-    return;
-  }
-  polygonPath(corners, toScreen);
-  ctx!.strokeStyle = closeness(error);
-  ctx!.lineWidth = 2;
-  ctx!.stroke();
-  for (const k of free) {
-    const c = corners[k];
-    const n = curve.nearest(c);
-    const p = toScreen(c);
-    const q = toScreen(n.point);
-    ctx!.strokeStyle = closeness(n.distance);
-    ctx!.lineWidth = 1.5;
-    ctx!.setLineDash([3, 4]);
-    ctx!.beginPath();
-    ctx!.moveTo(p.x, p.y);
-    ctx!.lineTo(q.x, q.y);
-    ctx!.stroke();
-    ctx!.setLineDash([]);
-    dot(p, 6, closeness(n.distance));
-  }
-}
-
-function draw(): void {
+function draw(now: number): void {
+  if (!game) return;
   const { toScreen, toCurve } = view();
   ctx!.clearRect(0, 0, canvas!.clientWidth, canvas!.clientHeight);
-
-  polygonPath(curve.vertices, toScreen);
-  ctx!.strokeStyle = '#e0e6eb';
-  ctx!.lineWidth = 2;
-  ctx!.stroke();
-
-  for (const q of hunt.found) {
-    polygonPath(q.corners, toScreen);
-    ctx!.fillStyle = 'rgba(102, 220, 120, 0.12)';
-    ctx!.fill();
-  }
-  if (reveal) {
-    ctx!.setLineDash([6, 6]);
-    for (const q of hunt.squares) {
-      polygonPath(q.corners, toScreen);
-      ctx!.strokeStyle = 'rgba(200, 160, 255, 0.7)';
-      ctx!.lineWidth = 1.5;
-      ctx!.stroke();
-    }
-    ctx!.setLineDash([]);
-  }
-
+  game.advance(now);
+  const curve = game.curve;
   const ts = thumbs.thumbs();
-  let error: number | null = null;
-  let hold: Hold = { square: null, progress: 0 };
-  const now = performance.now();
-  if (mode === 'corners') {
-    const params = ts.map((t) => (t ? curve.nearest(toCurve(t)).s : null));
-    if (params[0] !== null && params[1] !== null) {
-      const sq = bestEdgeSquare(curve, params[0], params[1]);
-      error = sq.error;
-      hold = hunt.hold(sq.corners, sq.error, now);
-      drawHeld(sq.corners, [2, 3], toScreen, sq.error, hold);
-    }
-    ts.forEach((t, i) => {
-      if (!t) return;
-      const corner = toScreen(curve.point(params[i]!));
-      ctx!.strokeStyle = THUMB_COLOURS[i];
-      ctx!.lineWidth = 2;
-      ctx!.beginPath();
-      ctx!.arc(t.x, t.y, 36, 0, 2 * Math.PI);
-      ctx!.stroke();
-      ctx!.setLineDash([4, 6]);
-      ctx!.beginPath();
-      ctx!.moveTo(t.x, t.y);
-      ctx!.lineTo(corner.x, corner.y);
-      ctx!.stroke();
-      ctx!.setLineDash([]);
-      dot(corner, 7, THUMB_COLOURS[i]);
-    });
-  } else {
-    const t = ts[0] ?? ts[1];
-    if (t) {
-      lastFit = fitSquareAtCentre(curve, toCurve(t), lastFit);
-      error = lastFit.error;
-      hold = hunt.hold(lastFit.corners, lastFit.error, now);
-      drawHeld(lastFit.corners, [0, 1, 2, 3], toScreen, lastFit.error, hold);
-      ctx!.strokeStyle = THUMB_COLOURS[0];
-      ctx!.lineWidth = 2;
-      ctx!.beginPath();
-      ctx!.arc(t.x, t.y, 36, 0, 2 * Math.PI);
-      ctx!.stroke();
-      dot(t, 4, THUMB_COLOURS[0]);
-    } else {
-      lastFit = undefined;
-    }
-  }
-
-  if (!hold.square) hunt.hold(null, 0, now);
-  // Keep animating while a dwell is under way, even if the thumbs are still.
-  if (hold.square && hold.progress < 1) requestDraw();
-  if (hunt.found.length > lastFound) navigator.vibrate?.(40);
-  lastFound = hunt.found.length;
-  const extra = hunt.extra > 0 ? ` (${hunt.extra} the solver missed)` : '';
-  const err = error === null ? '' : ` · error ${error.toFixed(3)}${hold.progress >= 1 ? ' ✓' : ''}`;
-  hud!.textContent =
-    `Found ${hunt.found.length} of ${hunt.squares.length}${extra}${err}` +
-    ` · curve ${seed ?? 'default'} · solved in ${solveMs.toFixed(0)} ms`;
+  const held = heldSquare.update(
+    curve,
+    control,
+    ts.map((t) => (t ? toCurve(t) : null)),
+  );
+  const r = new Renderer(ctx!, toScreen, TOLERANCE);
+  const animate = game.frame(r, held, now, reveal);
+  ts.forEach((t, i) => {
+    if (!t) return;
+    if (control === 'corners') r.thumb(t, i, curve.nearest(toCurve(t)).point);
+    else if (t === (ts[0] ?? ts[1])) r.thumb(t, 0);
+  });
+  hud!.textContent = `${MODE_NAMES[level!.mode]} · ${game.hud()}`;
+  if (animate) requestDraw();
 }
 
 const pos = (e: PointerEvent): Vec => {
@@ -273,19 +166,20 @@ canvas.addEventListener('pointermove', (e) => {
 for (const type of ['pointerup', 'pointercancel'] as const) {
   canvas.addEventListener(type, (e) => {
     thumbs.up(e.pointerId);
+    if (thumbs.thumbs().every((t) => t === null)) game?.released(performance.now());
     requestDraw();
   });
 }
 
-modeButton.addEventListener('click', () => {
-  mode = mode === 'corners' ? 'centre' : 'corners';
-  modeButton.textContent = MODE_LABELS[mode];
-  lastFit = undefined;
+levelsButton.addEventListener('click', showMenu);
+controlButton.addEventListener('click', () => {
+  control = control === 'corners' ? 'centre' : 'corners';
+  controlButton.textContent = CONTROL_NAMES[control];
+  heldSquare.reset();
   requestDraw();
 });
 newButton.addEventListener('click', () => {
-  loadCurve(Math.floor(Math.random() * 1e6));
-  requestDraw();
+  start(randomLevel(level?.mode ?? 'hunt', Math.floor(Math.random() * 1e6)));
 });
 revealButton.addEventListener('click', () => {
   reveal = !reveal;
@@ -293,8 +187,10 @@ revealButton.addEventListener('click', () => {
   requestDraw();
 });
 
-const hashSeed = Number.parseInt(location.hash.slice(1), 10);
-loadCurve(Number.isFinite(hashSeed) ? hashSeed : null);
-modeButton.textContent = MODE_LABELS[mode];
+buildMenu();
+controlButton.textContent = CONTROL_NAMES[control];
 window.addEventListener('resize', resize);
 resize();
+const initial = parseRoute(location.hash);
+if (initial) start(initial);
+else showMenu();

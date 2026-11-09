@@ -80,3 +80,43 @@ body {
   text-align: right;
   border-bottom: 1px solid #3a4651;
 }
+
+#menu {
+  position: fixed;
+  inset: 0;
+  padding: max(24px, env(safe-area-inset-top)) 16px 16px;
+  box-sizing: border-box;
+  overflow: auto;
+  background: #101418;
+  color: #e0e6eb;
+  font:
+    15px/1.4 system-ui,
+    sans-serif;
+}
+
+#menu[hidden] {
+  display: none;
+}
+
+#menu section {
+  margin-bottom: 24px;
+}
+
+#menu h2 {
+  font-size: 18px;
+  margin: 0 0 8px;
+}
+
+#menu button {
+  display: block;
+  width: 100%;
+  max-width: 360px;
+  margin-bottom: 8px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: #1d252c;
+  border: 1px solid #3a4651;
+  border-radius: 8px;
+  padding: 12px;
+}
