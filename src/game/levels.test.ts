@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { MorphingCurve } from '../geometry/morph';
 import { findSquares } from '../geometry/solver';
-import { LEVELS, levelCurve, parseRoute, routeOf } from './levels';
+import { GRACE_MS, TOLERANCE } from './feel';
+import { LEVELS, fitHuntSeed, levelCurve, parseRoute, routeOf } from './levels';
+import { foldTrace, huntProblems, strandedFolds } from './validate';
+
+const COUNT_WORDS: Record<string, number> = { Three: 3, Five: 5, Seven: 7, Nine: 9, Eleven: 11 };
 
 describe('levels', () => {
   it('round-trips every level and random curve through the URL hash', () => {
@@ -41,5 +45,32 @@ describe('levels', () => {
     for (const level of LEVELS.filter((l) => l.mode === 'hunt')) {
       expect(findSquares(levelCurve(level)).length, level.id!).toBeGreaterThan(1);
     }
+  });
+
+  it('validates every Square Hunt level: generic, squares told apart, the count its name says, and stable', () => {
+    for (const level of LEVELS.filter((l) => l.mode === 'hunt')) {
+      const curve = levelCurve(level);
+      const squares = findSquares(curve);
+      expect(huntProblems(curve, squares, TOLERANCE), level.id!).toEqual([]);
+      expect(squares.length, level.id!).toBe(COUNT_WORDS[level.name.split(' ')[0]]);
+      // A finer grid finds no square the default one missed (#6).
+      expect(findSquares(curve, { grid: 512 }).length, level.id!).toBe(squares.length);
+    }
+  }, 60_000);
+
+  it('never strands a player in the first minute of an Avoid Folds level', () => {
+    // After every fold, some square is alive within the grace time and lives at least a second after it.
+    for (const level of LEVELS.filter((l) => l.mode === 'folds')) {
+      const trace = foldTrace(new MorphingCurve(level.seed), 60, 0.5);
+      expect(strandedFolds(trace, GRACE_MS / 1000, 1), level.id!).toEqual([]);
+    }
+  }, 120_000);
+
+  it('moves a random Square Hunt seed on to the next curve that passes validation', () => {
+    expect(fitHuntSeed(1)).toBe(1);
+    const fitted = fitHuntSeed(28);
+    expect(fitted).toBeGreaterThan(28);
+    const curve = levelCurve({ id: null, name: 'Random', mode: 'hunt', seed: fitted });
+    expect(huntProblems(curve, findSquares(curve), TOLERANCE)).toEqual([]);
   });
 });

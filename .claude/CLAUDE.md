@@ -50,7 +50,7 @@ Capacitor, Steam with Electron or Tauri (plan doc: https://claude.ai/artifact/Cq
   (`.claude/WORKLOG-tracking.md`).
 - Game modes are separate and retained (project lead, 2026-11-09): each level in `src/game/levels.ts` launches one
   mode (`src/modes/`: Square Hunt, Avoid Folds). Mode rules live in DOM-free classes in `src/game/` (`hunt.ts`,
-  `folds.ts`); feel constants are guesses tracked in #5 and #12.
+  `folds.ts`); feel constants are guesses tracked in #5 and #12 (those the validator needs live in `src/game/feel.ts`).
 - `src/geometry/square.ts` (control 1) and `centre.ts` (control 2) build the held square; `src/game/hunt.ts` counts a
   held square only after Newton refinement confirms a real inscribed square near it, because a within-tolerance held
   square can be a near-miss (`.claude/WORKLOG-playtest-1.md`), and only after a dwell on that square, so scrubbing
@@ -62,7 +62,10 @@ Capacitor, Steam with Electron or Tauri (plan doc: https://claude.ai/artifact/Cq
   ~980 px wide, and the scale (plus CSS `zoom` on the buttons) keeps the game at phone size there.
 - `Polygon.nearest` is the hot loop of every solver; keep it allocation-free (`.claude/WORKLOG-solver.md`).
 - Level curves must be generic: symmetric curves inscribe continuous families of squares (#2), and polygon parity
-  is unverified (#1).
+  is unverified (#1). Every shipped level passes `src/game/validate.ts` in `levels.test.ts`: Square Hunt curves are
+  generic, odd, stable at grid 512, match their name's count, and have no two squares within `TOLERANCE` of each
+  other; Avoid Folds levels never strand the player after a fold (60 s trace). Random Square Hunt seeds go through
+  `fitHuntSeed`; random Avoid Folds seeds are not validated (`.claude/WORKLOG-level-validation.md`).
 
 ## Subsystem notes (`.claude/rules/`)
 

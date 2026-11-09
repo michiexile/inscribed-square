@@ -130,7 +130,7 @@ export class SquareTracker {
       let partner: number | null = null;
       for (const o of this.tracked) {
         if (o.id === t.id) continue;
-        const g = Math.max(dist(t.square.centre, o.square.centre), Math.abs(t.square.side - o.square.side));
+        const g = squareGap(t.square, o.square);
         if (g < gap) {
           gap = g;
           partner = o.id;
@@ -139,4 +139,9 @@ export class SquareTracker {
       return { ...t, gap, partner };
     });
   }
+}
+
+/** How far apart two squares are: the larger of the distance between centres and the difference in side. */
+export function squareGap(a: InscribedSquare, b: InscribedSquare): number {
+  return Math.max(dist(a.centre, b.centre), Math.abs(a.side - b.side));
 }

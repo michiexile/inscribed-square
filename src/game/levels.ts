@@ -1,5 +1,8 @@
 import type { Polygon } from '../geometry/polygon';
 import { randomCurve } from '../geometry/random';
+import { findSquares } from '../geometry/solver';
+import { TOLERANCE } from './feel';
+import { huntProblems } from './validate';
 
 /**
  * The game modes. Each level launches one of them.
@@ -25,7 +28,7 @@ export const LEVELS: readonly Level[] = [
   { id: 'hunt-1', name: 'Three squares', mode: 'hunt', seed: 1 },
   { id: 'hunt-2', name: 'Five squares', mode: 'hunt', seed: 2 },
   { id: 'hunt-3', name: 'Seven squares', mode: 'hunt', seed: 5 },
-  { id: 'hunt-4', name: 'Nine squares', mode: 'hunt', seed: 28 },
+  { id: 'hunt-4', name: 'Nine squares', mode: 'hunt', seed: 51 },
   { id: 'folds-1', name: 'Drift', mode: 'folds', seed: 1 },
   { id: 'folds-2', name: 'Undertow', mode: 'folds', seed: 2 },
   { id: 'folds-3', name: 'Churn', mode: 'folds', seed: 5 },
@@ -33,6 +36,17 @@ export const LEVELS: readonly Level[] = [
 
 /** A random curve in the given mode. */
 export const randomLevel = (mode: ModeId, seed: number): Level => ({ id: null, name: 'Random', mode, seed });
+
+/**
+ * The first seed from `seed` on whose Square Hunt curve passes `huntProblems`, so a random curve never has squares
+ * the player cannot tell apart. About one seed in seven is skipped.
+ */
+export function fitHuntSeed(seed: number): number {
+  for (let s = seed; ; s++) {
+    const curve = randomCurve(s);
+    if (huntProblems(curve, findSquares(curve), TOLERANCE).length === 0) return s;
+  }
+}
 
 /** The still curve of a Square Hunt level. */
 export const levelCurve = (level: Level): Polygon => randomCurve(level.seed);
