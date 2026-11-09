@@ -40,12 +40,20 @@ Capacitor, Steam with Electron or Tauri (plan doc: https://claude.ai/artifact/Cq
 - `src/geometry/solver.ts`: crude solver (grid over the (s, t) torus + Newton). Squares smaller than `minSide` are
   rejected, since collapsed squares along s = t have zero error; each square is reported once, not once per starting
   corner. It can miss squares closer than the grid spacing (#6). A full solve does not fit a frame; it runs once per
-  curve (`.claude/WORKLOG-solver.md`, #3).
+  still curve, or in a worker for morphing curves (`.claude/WORKLOG-solver.md`, #3).
+- `src/geometry/tracker.ts` follows squares on a morphing curve (`morph.ts`) frame to frame with `refineFrom`, never
+  `refine` (which can switch branch). A square dies when Newton fails or two squares land on the same square; births
+  are invisible locally, so `adopt` merges background full solves. Each tracker sub-step is at most 1/60 s
+  (`.claude/WORKLOG-tracking.md`).
+- Game modes are separate and retained (project lead, 2026-11-09): each level in `src/game/levels.ts` launches one
+  mode (`src/modes/`: Square Hunt, Avoid Folds). Mode rules live in DOM-free classes in `src/game/` (`hunt.ts`,
+  `folds.ts`); feel constants are guesses tracked in #5 and #12.
 - `src/geometry/square.ts` (control 1) and `centre.ts` (control 2) build the held square; `src/game/hunt.ts` counts a
   held square only after Newton refinement confirms a real inscribed square near it, because a within-tolerance held
   square can be a near-miss (`.claude/WORKLOG-playtest-1.md`), and only after a dwell on that square, so scrubbing
   does not collect squares (`.claude/WORKLOG-dwell.md`).
-- `src/main.ts` routes to the game (`src/app.ts`: canvas setup, drawing and event wiring) or the `?bench` page;
+- `src/main.ts` routes to the game (`src/app.ts`: canvas, level menu and event wiring; `src/render.ts`: drawing) or
+  the `?bench` page;
   keep logic out of `app.ts` so it stays testable.
 - `Polygon.nearest` is the hot loop of every solver; keep it allocation-free (`.claude/WORKLOG-solver.md`).
 - Level curves must be generic: symmetric curves inscribe continuous families of squares (#2), and polygon parity
