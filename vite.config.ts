@@ -5,5 +5,7 @@ export default defineConfig({
   base: process.env.PAGES_BASE ?? '/',
   test: {
     include: ['src/**/*.test.ts'],
+    // Geometry tests run full solves (tens of milliseconds each); CI runners are several times slower than a laptop.
+    testTimeout: 30_000,
   },
 });
