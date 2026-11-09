@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { radialFourier } from '../geometry/fourier';
 import { randomCurve } from '../geometry/random';
 import { findSquares } from '../geometry/solver';
-import { type FoldTrace, huntProblems, strandedFolds } from './validate';
+import { type FoldTrace, foldsProblems, huntProblems, strandedFolds } from './validate';
 
 const trace = (lifetimes: [number, number][], duration = 30): FoldTrace => ({
   duration,
@@ -75,5 +75,27 @@ describe('huntProblems', () => {
     expect(huntProblems(circle, findSquares(circle), 0.05).join()).toMatch(/continuous family/);
     const curve = randomCurve(1);
     expect(huntProblems(curve, findSquares(curve).slice(1), 0.05).join()).toMatch(/even/);
+  });
+});
+
+describe('foldsProblems', () => {
+  it('judges grace and hold in real seconds, so a faster morph needs a longer-lived rescue square', () => {
+    // Squares 1 and 2 fold at 10 s of morph time. After that only short-lived squares (1.2 to 1.5 s of morph time)
+    // are around until one born at 16.9 s lives on. At normal speed each lives long enough to hold for a second. At
+    // double speed they last under a real second each, and the long-lived one comes after the 3 real seconds (6 s
+    // of morph time) of grace: the player is stranded. A check that ignores the speed passes both.
+    const t = trace([
+      [0, 10],
+      [0, 10],
+      [0, 11.5],
+      [11.4, 12.6],
+      [12.5, 13.7],
+      [13.6, 14.8],
+      [14.7, 15.9],
+      [15.8, 17],
+      [16.9, Infinity],
+    ]);
+    expect(foldsProblems(t, 1, 3, 1)).toEqual([]);
+    expect(foldsProblems(t, 2, 3, 1)).toEqual(['stranded after the fold at 10.0 s (5.0 s real time)']);
   });
 });

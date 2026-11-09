@@ -64,7 +64,8 @@ Capacitor, Steam with Electron or Tauri (plan doc: https://claude.ai/artifact/Cq
 - Level curves must be generic: symmetric curves inscribe continuous families of squares (#2), and polygon parity
   is unverified (#1). Every shipped level passes `src/game/validate.ts` in `levels.test.ts`: Square Hunt curves are
   generic, odd, stable at grid 512, match their name's count, and have no two squares within `TOLERANCE` of each
-  other; Avoid Folds levels never strand the player after a fold (60 s trace). Random Square Hunt seeds go through
+  other; Avoid Folds levels never strand the player after a fold (60 real seconds at the level's `speed`, grace and
+  hold in real seconds; `.claude/WORKLOG-morph-speed.md`). Random Square Hunt seeds go through
   `fitHuntSeed`; random Avoid Folds seeds are not validated (`.claude/WORKLOG-level-validation.md`).
 
 ## Subsystem notes (`.claude/rules/`)

@@ -1,0 +1,1 @@
+- Avoid Folds levels now speed up: Undertow morphs 1.5× as fast as Drift, Churn 2×, and a new level, Rapids, 3×.
