@@ -12,6 +12,7 @@ import {
 } from './game/levels';
 import type { Vec } from './geometry/vec';
 import { ThumbTracker } from './input/pointers';
+import { uiScale } from './input/scale';
 import { FoldsMode } from './modes/foldsMode';
 import { HuntMode } from './modes/huntMode';
 import type { GameMode } from './modes/mode';
@@ -40,7 +41,7 @@ const DWELL_MS = 500;
 /** How long Avoid Folds gives the player to find another square after losing theirs, in milliseconds. */
 const GRACE_MS = 3000;
 /**
- * A thumb drives the point this many CSS pixels above it, so the thumb doesn't cover the square or the curve near it.
+ * A thumb drives the point this many layout pixels above it, so the thumb doesn't cover the square or the curve near it.
  */
 const GRAB_OFFSET = 80;
 
@@ -48,6 +49,11 @@ let control: Control = 'corners';
 let reveal = false;
 let level: Level | null = null;
 let game: GameMode | null = null;
+/**
+ * CSS pixels per layout pixel (`uiScale`). Canvas drawing, pointer positions and the thumb offset are all in layout
+ * pixels, and the buttons are zoomed by it, so a browser in desktop mode shows the game at phone size.
+ */
+let scale = 1;
 const thumbs = new ThumbTracker();
 const heldSquare = new HeldSquare();
 
@@ -73,7 +79,12 @@ function showMenu(): void {
   menu!.hidden = false;
   hud!.textContent = '';
   showBanner(null);
-  ctx!.clearRect(0, 0, canvas!.clientWidth, canvas!.clientHeight);
+  clear();
+}
+
+/** Clears the whole canvas. */
+function clear(): void {
+  ctx!.clearRect(0, 0, canvas!.clientWidth / scale, canvas!.clientHeight / scale);
 }
 
 function buildMenu(): void {
@@ -96,10 +107,10 @@ function buildMenu(): void {
   }
 }
 
-/** Maps curve coordinates (roughly [-1.5, 1.5]²) to CSS pixels, centred on the canvas. */
+/** Maps curve coordinates (roughly [-1.5, 1.5]²) to layout pixels, centred on the canvas. */
 function view(): { toScreen: (p: Vec) => Vec; toCurve: (p: Vec) => Vec } {
-  const w = canvas!.clientWidth;
-  const h = canvas!.clientHeight;
+  const w = canvas!.clientWidth / scale;
+  const h = canvas!.clientHeight / scale;
   const k = Math.min(w, h) / 3.4;
   return {
     toScreen: (p) => ({ x: w / 2 + p.x * k, y: h / 2 - p.y * k }),
@@ -108,10 +119,13 @@ function view(): { toScreen: (p: Vec) => Vec; toCurve: (p: Vec) => Vec } {
 }
 
 function resize(): void {
+  scale = uiScale(window.innerWidth, window.screen.width, window.matchMedia('(pointer: coarse)').matches);
+  for (const el of [document.querySelector<HTMLElement>('#bar'), menu])
+    el?.style.setProperty('zoom', String(scale));
   const dpr = window.devicePixelRatio || 1;
   canvas!.width = Math.round(canvas!.clientWidth * dpr);
   canvas!.height = Math.round(canvas!.clientHeight * dpr);
-  ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx!.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0);
   requestDraw();
 }
 
@@ -129,7 +143,7 @@ function requestDraw(): void {
 function draw(now: number): void {
   if (!game) return;
   const { toScreen, toCurve } = view();
-  ctx!.clearRect(0, 0, canvas!.clientWidth, canvas!.clientHeight);
+  clear();
   game.advance(now);
   const curve = game.curve;
   const ts = thumbs.thumbs();
@@ -184,7 +198,7 @@ function showBanner(b: Banner | null): void {
 
 const pos = (e: PointerEvent): Vec => {
   const r = canvas.getBoundingClientRect();
-  return { x: e.clientX - r.left, y: e.clientY - r.top };
+  return { x: (e.clientX - r.left) / scale, y: (e.clientY - r.top) / scale };
 };
 
 canvas.addEventListener('pointerdown', (e) => {

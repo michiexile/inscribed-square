@@ -54,7 +54,9 @@ Capacitor, Steam with Electron or Tauri (plan doc: https://claude.ai/artifact/Cq
   does not collect squares (`.claude/WORKLOG-dwell.md`).
 - `src/main.ts` routes to the game (`src/app.ts`: canvas, level menu and event wiring; `src/render.ts`: drawing) or
   the `?bench` page;
-  keep logic out of `app.ts` so it stays testable.
+  keep logic out of `app.ts` so it stays testable. Canvas drawing, pointer positions and pixel constants are in layout
+  pixels, which are `uiScale` CSS pixels (`src/input/scale.ts`): a phone browser in desktop mode lays the page out
+  ~980 px wide, and the scale (plus CSS `zoom` on the buttons) keeps the game at phone size there.
 - `Polygon.nearest` is the hot loop of every solver; keep it allocation-free (`.claude/WORKLOG-solver.md`).
 - Level curves must be generic: symmetric curves inscribe continuous families of squares (#2), and polygon parity
   is unverified (#1).
