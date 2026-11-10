@@ -86,6 +86,14 @@ body {
   color: #ffb3ad;
 }
 
+#banner[data-tone='info'] {
+  border-color: #4fc3f7;
+}
+
+#banner[data-tone='info'] strong {
+  font-size: 22px;
+}
+
 #banner[data-tone='over'] {
   border-color: #c8a0ff;
 }
@@ -161,4 +169,10 @@ body {
   border: 1px solid #3a4651;
   border-radius: 8px;
   padding: 12px;
+}
+
+#menu button.primary {
+  font-weight: 600;
+  background: #1e3a2a;
+  border-color: #66dc78;
 }

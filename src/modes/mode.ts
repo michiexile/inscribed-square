@@ -16,6 +16,10 @@ export interface GameMode {
   frame(r: Renderer, held: Held | null, now: number, reveal: boolean): boolean;
   /** One line of status for the HUD. */
   hud(): string;
+  /** True once the player has done the mode's first thing: found a square, or latched onto one. */
+  started(): boolean;
+  /** True once the level is cleared: every square found, or the Avoid Folds goal reached. */
+  cleared(): boolean;
   /** A large message the player must not miss, or null. */
   banner(): Banner | null;
   /** Starts the level over, after its banner's button is pressed. */

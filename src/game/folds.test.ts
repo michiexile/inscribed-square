@@ -77,4 +77,28 @@ describe('AvoidFolds', () => {
     expect(game.update(held(0), 0, [tracked(1, 0)], [], 6000).phase).toBe('over');
     expect(game.score).toBeCloseTo(2);
   });
+
+  it('clears the level once one round reaches the goal, and stops scoring there', () => {
+    const game = new AvoidFolds(TOL, GRACE, 2);
+    game.update(held(0), 0, [tracked(1, 0)], [], 0);
+    expect(game.update(held(0), 0, [tracked(1, 0)], [], 1999).phase).toBe('holding');
+    expect(game.update(held(0), 0, [tracked(1, 0)], [], 2100).phase).toBe('won');
+    expect(game.update(held(0), 0, [tracked(1, 0)], [], 5000).phase).toBe('won');
+    expect(game.score).toBe(2);
+  });
+
+  it('counts held time across saves towards the goal, but not the grace time', () => {
+    const game = new AvoidFolds(TOL, GRACE, 2);
+    game.update(held(0), 0, [tracked(1, 0), tracked(2, 5)], [], 0);
+    game.update(held(0), 0, [tracked(2, 5)], [tracked(1, 0)], 1500);
+    game.update(held(5), 0, [tracked(2, 5)], [], 4000);
+    expect(game.update(held(5), 0, [tracked(2, 5)], [], 4400).phase).toBe('holding');
+    expect(game.update(held(5), 0, [tracked(2, 5)], [], 4600).phase).toBe('won');
+  });
+
+  it('never clears without a goal', () => {
+    const game = new AvoidFolds(TOL, GRACE);
+    game.update(held(0), 0, [tracked(1, 0)], [], 0);
+    expect(game.update(held(0), 0, [tracked(1, 0)], [], 1e7).phase).toBe('holding');
+  });
 });
