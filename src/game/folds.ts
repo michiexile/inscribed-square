@@ -7,8 +7,9 @@ import { type Vec, add, dist, scale } from '../geometry/vec';
  * - `holding`: the held square is latched onto a live square and the score is running.
  * - `lost`: the latch broke, because the square folded away or the player slipped off; the grace clock is running.
  * - `over`: the grace time ran out.
+ * - `won`: the score reached the goal, clearing the level.
  */
-export type Phase = 'searching' | 'holding' | 'lost' | 'over';
+export type Phase = 'searching' | 'holding' | 'lost' | 'over' | 'won';
 
 export interface FoldsState {
   readonly phase: Phase;
@@ -22,7 +23,8 @@ export interface FoldsState {
  * Avoid Folds on a morphing curve. The player latches onto an inscribed square by holding a square within the
  * tolerance of it, then scores for every second they stay on it. Once latched, the held square may wander up to three
  * tolerances away, since the curve moves under the thumbs. When the square folds away or the player slips off, they
- * have the grace time to latch onto any square, or the round ends.
+ * have the grace time to latch onto any square, or the round ends. With a goal, the round is won once the score
+ * reaches it.
  */
 export class AvoidFolds {
   /** Seconds spent latched. */
@@ -42,6 +44,8 @@ export class AvoidFolds {
     readonly tolerance: number,
     /** Milliseconds allowed to latch on again after losing the square. */
     readonly grace: number,
+    /** Seconds of score that win the round; none means the round runs until lost. */
+    readonly goal?: number,
   ) {}
 
   /**
@@ -57,11 +61,16 @@ export class AvoidFolds {
   ): FoldsState {
     const dt = now - this.lastTime;
     this.lastTime = now;
-    if (this.phase === 'over') return this.state(null, now);
+    if (this.phase === 'over' || this.phase === 'won') return this.state(null, now);
 
     if (this.phase === 'holding') {
       // The square was held up to this frame, whatever this frame finds.
       this.score += dt / 1000;
+      if (this.goal !== undefined && this.score >= this.goal) {
+        this.score = this.goal;
+        this.phase = 'won';
+        return this.state(null, now);
+      }
       const current = squares.find((q) => q.id === this.latched);
       if (!current || died.some((d) => d.id === this.latched)) {
         this.lose(now, true);

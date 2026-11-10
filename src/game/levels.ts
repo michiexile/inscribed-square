@@ -24,18 +24,30 @@ export interface Level {
   readonly seed: number;
   /** Avoid Folds only: morph seconds per real second. Default 1. Later levels morph faster. */
   readonly speed?: number;
+  /** Avoid Folds only: seconds held in one round that clear the level. Random curves have none and run until lost. */
+  readonly goal?: number;
 }
 
+/**
+ * The campaign, in the order it is played. It opens with two still curves so the control is learnt before the curve
+ * moves, then alternates modes. Goals are guesses (#12).
+ */
 export const LEVELS: readonly Level[] = [
   { id: 'hunt-1', name: 'Three squares', mode: 'hunt', seed: 1 },
   { id: 'hunt-2', name: 'Five squares', mode: 'hunt', seed: 2 },
+  { id: 'folds-1', name: 'Drift', mode: 'folds', seed: 1, goal: 20 },
   { id: 'hunt-3', name: 'Seven squares', mode: 'hunt', seed: 5 },
+  { id: 'folds-2', name: 'Undertow', mode: 'folds', seed: 2, speed: 1.5, goal: 25 },
   { id: 'hunt-4', name: 'Nine squares', mode: 'hunt', seed: 51 },
-  { id: 'folds-1', name: 'Drift', mode: 'folds', seed: 1 },
-  { id: 'folds-2', name: 'Undertow', mode: 'folds', seed: 2, speed: 1.5 },
-  { id: 'folds-3', name: 'Churn', mode: 'folds', seed: 5, speed: 2 },
-  { id: 'folds-4', name: 'Rapids', mode: 'folds', seed: 3, speed: 3 },
+  { id: 'folds-3', name: 'Churn', mode: 'folds', seed: 5, speed: 2, goal: 30 },
+  { id: 'folds-4', name: 'Rapids', mode: 'folds', seed: 3, speed: 3, goal: 30 },
 ];
+
+/** The level after this one in the campaign, or null after the last level or a random curve. */
+export function nextLevel(level: Level): Level | null {
+  const i = level.id === null ? -1 : LEVELS.findIndex((l) => l.id === level.id);
+  return i >= 0 && i + 1 < LEVELS.length ? LEVELS[i + 1] : null;
+}
 
 /** A random curve in the given mode. */
 export const randomLevel = (mode: ModeId, seed: number): Level => ({ id: null, name: 'Random', mode, seed });
