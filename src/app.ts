@@ -20,6 +20,7 @@ import { ThumbTracker } from './input/pointers';
 import { uiScale } from './input/scale';
 import { FoldsMode } from './modes/foldsMode';
 import { HuntMode } from './modes/huntMode';
+import { PredictMode } from './modes/predictMode';
 import type { GameMode } from './modes/mode';
 import { Renderer } from './render';
 
@@ -84,15 +85,17 @@ function start(next: Level): void {
   const label = next.id ? next.name : `random curve ${next.seed}`;
   game = isStill(next.mode)
     ? new HuntMode(levelCurve(next), TOLERANCE, DWELL_MS, label, next.mode === 'count')
-    : new FoldsMode(
-        next.seed,
-        next.speed ?? 1,
-        TOLERANCE,
-        GRACE_MS,
-        label,
-        next.goal,
-        next.mode === 'choice' ? LIFELINE_HORIZON : 0,
-      );
+    : next.mode === 'predict'
+      ? new PredictMode(next.seed, next.warning, next.rounds, next.goal, label)
+      : new FoldsMode(
+          next.seed,
+          next.speed ?? 1,
+          TOLERANCE,
+          GRACE_MS,
+          label,
+          next.goal,
+          next.mode === 'choice' ? LIFELINE_HORIZON : 0,
+        );
   intro = !progress.hasSeenIntro(next.mode);
   heldSquare.reset();
   history.replaceState(null, '', routeOf(next));
@@ -139,7 +142,7 @@ function buildMenu(): void {
       'primary';
     menu!.append(section);
   }
-  for (const mode of ['hunt', 'count', 'folds', 'choice'] as ModeId[]) {
+  for (const mode of ['hunt', 'count', 'folds', 'choice', 'predict'] as ModeId[]) {
     const section = document.createElement('section');
     const heading = document.createElement('h2');
     heading.textContent = MODE_NAMES[mode];
@@ -195,19 +198,22 @@ function draw(now: number): void {
   const curve = game.curve;
   const ts = thumbs.thumbs();
   const grab = ts.map((t) => (t ? { x: t.x, y: t.y - GRAB_OFFSET } : null));
-  const held = heldSquare.update(
-    curve,
-    control,
-    grab.map((g) => (g ? toCurve(g) : null)),
-  );
+  const held = game.tapOnly
+    ? null
+    : heldSquare.update(
+        curve,
+        control,
+        grab.map((g) => (g ? toCurve(g) : null)),
+      );
   const r = new Renderer(ctx!, toScreen, TOLERANCE);
   const animate = game.frame(r, held, now, reveal);
-  ts.forEach((t, i) => {
-    if (!t) return;
-    const g = grab[i]!;
-    if (control === 'corners') r.thumb(t, i, toScreen(curve.nearest(toCurve(g)).point));
-    else if (t === (ts[0] ?? ts[1])) r.thumb(t, 0, g);
-  });
+  if (!game.tapOnly)
+    ts.forEach((t, i) => {
+      if (!t) return;
+      const g = grab[i]!;
+      if (control === 'corners') r.thumb(t, i, toScreen(curve.nearest(toCurve(g)).point));
+      else if (t === (ts[0] ?? ts[1])) r.thumb(t, 0, g);
+    });
   hud!.textContent = `${MODE_NAMES[level!.mode]} · ${game.hud()}`;
   claimButton!.hidden = !game.claim || game.cleared();
   showBanner(currentBanner(game, level!));
@@ -272,6 +278,7 @@ const pos = (e: PointerEvent): Vec => {
 };
 
 canvas.addEventListener('pointerdown', (e) => {
+  game?.tap?.(pos(e), performance.now());
   if (thumbs.down(e.pointerId, pos(e)) !== null) {
     // Capture keeps moves coming when a thumb slides off the canvas edge. It can fail for a pointer the
     // browser has already released, which must not stop the redraw.

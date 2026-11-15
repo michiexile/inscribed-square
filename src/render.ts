@@ -98,6 +98,23 @@ export class Renderer {
     ctx.stroke();
   }
 
+  /** A round letter badge at a screen point, for picking a square by tapping, with a thin line to `from`. */
+  badge(at: Vec, letter: string, colour: string, from: Vec): void {
+    this.ctx.strokeStyle = colour;
+    this.ctx.lineWidth = 1;
+    this.ctx.beginPath();
+    this.ctx.moveTo(from.x, from.y);
+    this.ctx.lineTo(at.x, at.y);
+    this.ctx.stroke();
+    this.dot(at, 13, '#101418');
+    this.ctx.strokeStyle = colour;
+    this.ctx.lineWidth = 2;
+    this.ctx.beginPath();
+    this.ctx.arc(at.x, at.y, 13, 0, 2 * Math.PI);
+    this.ctx.stroke();
+    this.label(at, letter, colour);
+  }
+
   /** Centred text at a screen point. */
   label(at: Vec, text: string, colour: string): void {
     this.ctx.font = '600 14px system-ui, sans-serif';

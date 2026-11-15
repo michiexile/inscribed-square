@@ -5,13 +5,14 @@ import { GRACE_MS, TOLERANCE } from './feel';
 import {
   LEVELS,
   fitHuntSeed,
-  isStill,
+  isHeld,
   levelCurve,
   nextLevel,
   parseRoute,
   randomLevel,
   routeOf,
 } from './levels';
+import { foldRound } from './predict';
 import { foldTrace, foldsProblems, huntProblems } from './validate';
 
 const COUNT_WORDS: Record<string, number> = { Three: 3, Five: 5, Seven: 7, Nine: 9, Eleven: 11 };
@@ -35,12 +36,14 @@ describe('levels', () => {
   });
 
   it('has every mode, with distinct ids', () => {
-    expect(new Set(LEVELS.map((l) => l.mode))).toEqual(new Set(['hunt', 'folds', 'count', 'choice']));
+    expect(new Set(LEVELS.map((l) => l.mode))).toEqual(
+      new Set(['hunt', 'folds', 'count', 'choice', 'predict']),
+    );
     expect(new Set(LEVELS.map((l) => l.id)).size).toBe(LEVELS.length);
   });
 
   it('gives every morphing level a fold within its first 20 seconds', () => {
-    for (const level of LEVELS.filter((l) => !isStill(l.mode))) {
+    for (const level of LEVELS.filter((l) => isHeld(l.mode))) {
       const morph = new MorphingCurve(level.seed!);
       const counts = new Set<number>();
       // Stop at the first change: one fold is all the test needs, and each full solve costs tens of milliseconds.
@@ -70,7 +73,7 @@ describe('levels', () => {
   it("never strands a player in the first minute of a morphing level, at the level's own speed", () => {
     // After every fold, some square is alive within the grace time and lives at least a second after it, both in
     // real seconds.
-    for (const level of LEVELS.filter((l) => !isStill(l.mode))) {
+    for (const level of LEVELS.filter((l) => isHeld(l.mode))) {
       const speed = level.speed ?? 1;
       const trace = foldTrace(new MorphingCurve(level.seed), 60 * speed, 0.5);
       expect(foldsProblems(trace, speed, GRACE_MS / 1000, 1), level.id!).toEqual([]);
@@ -137,6 +140,23 @@ describe('levels', () => {
         );
     }
   }, 60_000);
+
+  it('stores Fold Forecast rounds that are all real rounds, with a reachable goal', () => {
+    const levels = LEVELS.filter((l) => l.mode === 'predict');
+    expect(levels.length).toBeGreaterThan(0);
+    for (const level of levels) {
+      expect(level.rounds!.length, level.id!).toBeGreaterThanOrEqual(5);
+      expect(level.goal!, level.id!).toBeLessThanOrEqual(level.rounds!.length);
+      const morph = new MorphingCurve(level.seed);
+      for (const t of level.rounds!)
+        expect(foldRound(morph, t, level.warning!), `${level.id} at ${t}`).not.toBeNull();
+    }
+  }, 60_000);
+
+  it('asks Fold Forecast questions earlier, so harder, as the levels go on', () => {
+    const warnings = LEVELS.filter((l) => l.mode === 'predict').map((l) => l.warning!);
+    for (let i = 1; i < warnings.length; i++) expect(warnings[i]).toBeGreaterThan(warnings[i - 1]);
+  });
 
   it('plays an Avoid Folds level before the first Lifelines level, which adds a choice to it', () => {
     const first = LEVELS.findIndex((l) => l.mode === 'choice');

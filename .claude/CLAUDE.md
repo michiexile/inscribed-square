@@ -53,7 +53,9 @@ https://claude.ai/artifact/CqdHHDvThUbNKJiYkcmq2t, partly superseded).
   mode (`src/modes/`: Square Hunt, Avoid Folds, and Odd One Out, which is `HuntMode` with the count hidden until a
   right claim, `src/game/count.ts`; its messages never reveal the count before then; and Lifelines, which is `FoldsMode`
   with a horizon: `LeadTracker` (`src/geometry/lookahead.ts`) runs the tracker that far ahead of the display so each
-  square's death time is known, and full solves for it are made at its `aheadTime`). `LEVELS` is the campaign in play order (Next level follows it; a first
+  square's death time is known, and full solves for it are made at its `aheadTime`; and Fold Forecast, `PredictMode`,
+  played by tapping (`GameMode.tapOnly`), whose rounds come from `foldRound` in `src/game/predict.ts` and are stored as
+  morph times in campaign levels). `LEVELS` is the campaign in play order (Next level follows it; a first
   visit with no progress starts at `LEVELS[0]`); Avoid Folds levels clear at their `goal` seconds held in one round.
   Progress (cleared levels, seen intros) lives in `src/game/progress.ts` and must survive blocked or junk storage. Mode rules live in DOM-free classes in `src/game/` (`hunt.ts`,
   `folds.ts`); feel constants are guesses tracked in #5 and #12 (those the validator needs live in `src/game/feel.ts`).
