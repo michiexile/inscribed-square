@@ -1,3 +1,4 @@
+import { type Control, isControl } from './control';
 import type { Level } from './levels';
 
 /** The part of `localStorage` that `Progress` uses. */
@@ -9,26 +10,30 @@ export interface KeyValueStore {
 interface Saved {
   cleared: string[];
   intros: string[];
+  control?: Control;
 }
 
 const isStrings = (x: unknown): x is string[] => Array.isArray(x) && x.every((v) => typeof v === 'string');
 
 /**
- * The player's progress on this device: which levels they have cleared and which intros they have seen. Storage can
+ * The player's progress on this device: which levels they have cleared, which intros they have seen, and which
+ * control they chose. Storage can
  * be missing, blocked or hold junk; then progress lasts only for the session, and the game still runs.
  */
 export class Progress {
   static readonly KEY = 'inscribed-square.progress';
   private readonly cleared = new Set<string>();
   private readonly intros = new Set<string>();
+  private chosen: Control | null = null;
 
   constructor(private readonly store: KeyValueStore | null) {
     try {
       const raw: unknown = JSON.parse(store?.getItem(Progress.KEY) ?? 'null');
       if (raw && typeof raw === 'object') {
-        const { cleared, intros } = raw as Partial<Record<keyof Saved, unknown>>;
+        const { cleared, intros, control } = raw as Partial<Record<keyof Saved, unknown>>;
         if (isStrings(cleared)) for (const id of cleared) this.cleared.add(id);
         if (isStrings(intros)) for (const id of intros) this.intros.add(id);
+        if (isControl(control)) this.chosen = control;
       }
     } catch {
       /* unreadable: start empty */
@@ -55,6 +60,16 @@ export class Progress {
     this.save();
   }
 
+  /** The control the player last chose, or null if they never chose one. */
+  control(): Control | null {
+    return this.chosen;
+  }
+
+  setControl(control: Control): void {
+    this.chosen = control;
+    this.save();
+  }
+
   /** The first level in `levels` not yet cleared, or null when all are. */
   next(levels: readonly Level[]): Level | null {
     return levels.find((l) => l.id !== null && !this.cleared.has(l.id)) ?? null;
@@ -62,6 +77,7 @@ export class Progress {
 
   private save(): void {
     const saved: Saved = { cleared: [...this.cleared], intros: [...this.intros] };
+    if (this.chosen) saved.control = this.chosen;
     try {
       this.store?.setItem(Progress.KEY, JSON.stringify(saved));
     } catch {

@@ -1,5 +1,5 @@
 import { type Banner, introBanner } from './game/banner';
-import { CONTROL_NAMES, type Control, HeldSquare } from './game/control';
+import { CONTROL_NAMES, type Control, DEFAULT_CONTROL, HeldSquare } from './game/control';
 import { GRACE_MS, TOLERANCE } from './game/feel';
 import {
   LEVELS,
@@ -54,7 +54,6 @@ const DWELL_MS = 500;
  */
 const GRAB_OFFSET = 80;
 
-let control: Control = 'corners';
 let reveal = false;
 let level: Level | null = null;
 let game: GameMode | null = null;
@@ -74,6 +73,7 @@ function storage(): KeyValueStore | null {
   }
 }
 const progress = new Progress(storage());
+let control: Control = progress.control() ?? DEFAULT_CONTROL;
 /** Whether this level shows its mode's intro until the player starts: only until they have seen it once. */
 let intro = false;
 
@@ -290,6 +290,7 @@ for (const type of ['pointerup', 'pointercancel'] as const) {
 levelsButton.addEventListener('click', showMenu);
 controlButton.addEventListener('click', () => {
   control = control === 'corners' ? 'centre' : 'corners';
+  progress.setControl(control);
   controlButton.textContent = CONTROL_NAMES[control];
   heldSquare.reset();
   requestDraw();

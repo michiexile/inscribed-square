@@ -64,7 +64,7 @@ export function introBanner(mode: ModeId, control: Control, goal: number | undef
   const hold =
     control === 'corners'
       ? 'Put two thumbs on the screen: each one slides a corner of a square along the curve.'
-      : 'Drag one thumb to move a square around; it fits itself to the curve.';
+      : 'Drag one finger to move a square around; it fits itself to the curve.';
   if (mode === 'count') {
     return {
       title: 'How many squares?',

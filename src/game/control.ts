@@ -12,6 +12,11 @@ export type Control = 'corners' | 'centre';
 
 export const CONTROL_NAMES: Record<Control, string> = { corners: 'Two corners', centre: 'Drag centre' };
 
+/** The control a new player starts with: one finger works however the phone is held. */
+export const DEFAULT_CONTROL: Control = 'centre';
+
+export const isControl = (x: unknown): x is Control => x === 'corners' || x === 'centre';
+
 /** The square the thumbs hold this frame. */
 export interface Held {
   readonly corners: Corners;
