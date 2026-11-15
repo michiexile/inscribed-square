@@ -59,6 +59,14 @@ export class HuntMode implements GameMode {
     );
   }
 
+  started(): boolean {
+    return this.hunt.found.length > 0;
+  }
+
+  cleared(): boolean {
+    return this.hunt.squares.length > 0 && this.hunt.found.length >= this.hunt.squares.length;
+  }
+
   banner(): Banner | null {
     return huntBanner(this.hunt.found.length, this.hunt.squares.length);
   }

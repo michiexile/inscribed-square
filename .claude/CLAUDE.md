@@ -49,7 +49,9 @@ Capacitor, Steam with Electron or Tauri (plan doc: https://claude.ai/artifact/Cq
   are invisible locally, so `adopt` merges background full solves. Each tracker sub-step is at most 1/60 s
   (`.claude/WORKLOG-tracking.md`).
 - Game modes are separate and retained (project lead, 2026-11-09): each level in `src/game/levels.ts` launches one
-  mode (`src/modes/`: Square Hunt, Avoid Folds). Mode rules live in DOM-free classes in `src/game/` (`hunt.ts`,
+  mode (`src/modes/`: Square Hunt, Avoid Folds). `LEVELS` is the campaign in play order (Next level follows it; a first
+  visit with no progress starts at `LEVELS[0]`); Avoid Folds levels clear at their `goal` seconds held in one round.
+  Progress (cleared levels, seen intros) lives in `src/game/progress.ts` and must survive blocked or junk storage. Mode rules live in DOM-free classes in `src/game/` (`hunt.ts`,
   `folds.ts`); feel constants are guesses tracked in #5 and #12 (those the validator needs live in `src/game/feel.ts`).
 - `src/geometry/square.ts` (control 1) and `centre.ts` (control 2) build the held square; `src/game/hunt.ts` counts a
   held square only after Newton refinement confirms a real inscribed square near it, because a within-tolerance held

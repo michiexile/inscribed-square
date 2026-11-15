@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MorphingCurve } from '../geometry/morph';
 import { findSquares } from '../geometry/solver';
 import { GRACE_MS, TOLERANCE } from './feel';
-import { LEVELS, fitHuntSeed, levelCurve, parseRoute, routeOf } from './levels';
+import { LEVELS, fitHuntSeed, levelCurve, nextLevel, parseRoute, randomLevel, routeOf } from './levels';
 import { foldTrace, foldsProblems, huntProblems } from './validate';
 
 const COUNT_WORDS: Record<string, number> = { Three: 3, Five: 5, Seven: 7, Nine: 9, Eleven: 11 };
@@ -72,6 +72,24 @@ describe('levels', () => {
     const speeds = LEVELS.filter((l) => l.mode === 'folds').map((l) => l.speed ?? 1);
     expect(speeds[0]).toBe(1);
     for (let i = 1; i < speeds.length; i++) expect(speeds[i]).toBeGreaterThan(speeds[i - 1]);
+  });
+
+  it('opens the campaign on a still curve, so the control is learnt before the curve moves', () => {
+    expect(LEVELS[0].mode).toBe('hunt');
+    expect(LEVELS[1].mode).toBe('hunt');
+  });
+
+  it('leads from each level to the next in campaign order, and from the last or a random curve to nothing', () => {
+    for (let i = 0; i + 1 < LEVELS.length; i++) expect(nextLevel(LEVELS[i])).toBe(LEVELS[i + 1]);
+    expect(nextLevel(LEVELS[LEVELS.length - 1])).toBeNull();
+    expect(nextLevel(randomLevel('hunt', 7))).toBeNull();
+  });
+
+  it('gives every Avoid Folds level a goal, and asks for longer holds as the levels go on', () => {
+    const goals = LEVELS.filter((l) => l.mode === 'folds').map((l) => l.goal);
+    for (const g of goals) expect(g).toBeGreaterThan(0);
+    for (let i = 1; i < goals.length; i++) expect(goals[i]!).toBeGreaterThanOrEqual(goals[i - 1]!);
+    expect(randomLevel('folds', 3).goal).toBeUndefined();
   });
 
   it('moves a random Square Hunt seed on to the next curve that passes validation', () => {

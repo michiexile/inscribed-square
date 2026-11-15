@@ -1,4 +1,4 @@
-import type { Banner } from './game/banner';
+import { type Banner, introBanner } from './game/banner';
 import { CONTROL_NAMES, type Control, HeldSquare } from './game/control';
 import { GRACE_MS, TOLERANCE } from './game/feel';
 import {
@@ -8,10 +8,12 @@ import {
   type ModeId,
   fitHuntSeed,
   levelCurve,
+  nextLevel,
   parseRoute,
   randomLevel,
   routeOf,
 } from './game/levels';
+import { type KeyValueStore, Progress } from './game/progress';
 import type { Vec } from './geometry/vec';
 import { ThumbTracker } from './input/pointers';
 import { uiScale } from './input/scale';
@@ -51,6 +53,17 @@ let game: GameMode | null = null;
 let scale = 1;
 const thumbs = new ThumbTracker();
 const heldSquare = new HeldSquare();
+/** Reading `localStorage` itself throws where site data is blocked. */
+function storage(): KeyValueStore | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+const progress = new Progress(storage());
+/** Whether this level shows its mode's intro until the player starts: only until they have seen it once. */
+let intro = false;
 
 function start(next: Level): void {
   game?.dispose();
@@ -60,7 +73,8 @@ function start(next: Level): void {
   game =
     next.mode === 'hunt'
       ? new HuntMode(levelCurve(next), TOLERANCE, DWELL_MS, label)
-      : new FoldsMode(next.seed, next.speed ?? 1, TOLERANCE, GRACE_MS, label);
+      : new FoldsMode(next.seed, next.speed ?? 1, TOLERANCE, GRACE_MS, label, next.goal);
+  intro = !progress.hasSeenIntro(next.mode);
   heldSquare.reset();
   history.replaceState(null, '', routeOf(next));
   menu!.hidden = true;
@@ -72,6 +86,7 @@ function showMenu(): void {
   game = null;
   level = null;
   history.replaceState(null, '', location.pathname + location.search);
+  buildMenu();
   menu!.hidden = false;
   hud!.textContent = '';
   showBanner(null);
@@ -83,23 +98,38 @@ function clear(): void {
   ctx!.clearRect(0, 0, canvas!.clientWidth / scale, canvas!.clientHeight / scale);
 }
 
+/** A menu button that runs `onClick`, appended to `parent`. */
+function menuButton(parent: HTMLElement, text: string, onClick: () => void): HTMLButtonElement {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.textContent = text;
+  b.addEventListener('click', onClick);
+  parent.append(b);
+  return b;
+}
+
+/** The menu: a button for the first uncleared level, then every level by mode, cleared ones ticked. */
 function buildMenu(): void {
   menu!.replaceChildren();
+  const next = progress.next(LEVELS);
+  if (next) {
+    const section = document.createElement('section');
+    const fresh = LEVELS.every((l) => !progress.isCleared(l.id!));
+    menuButton(section, `${fresh ? 'Play' : 'Continue'}: ${next.name}`, () => start(next)).className =
+      'primary';
+    menu!.append(section);
+  }
   for (const mode of ['hunt', 'folds'] as ModeId[]) {
     const section = document.createElement('section');
     const heading = document.createElement('h2');
     heading.textContent = MODE_NAMES[mode];
     section.append(heading);
-    const add = (text: string, onClick: () => void) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.textContent = text;
-      b.addEventListener('click', onClick);
-      section.append(b);
-    };
-    for (const l of LEVELS.filter((l) => l.mode === mode))
-      add(l.speed && l.speed !== 1 ? `${l.name} · ${l.speed}× speed` : l.name, () => start(l));
-    add('Random curve', () => start(randomLevel(mode, Math.floor(Math.random() * 1e6))));
+    for (const l of LEVELS.filter((l) => l.mode === mode)) {
+      const speed = l.speed && l.speed !== 1 ? ` · ${l.speed}× speed` : '';
+      const tick = progress.isCleared(l.id!) ? ' ✓' : '';
+      menuButton(section, `${l.name}${speed}${tick}`, () => start(l));
+    }
+    menuButton(section, 'Random curve', () => start(randomLevel(mode, Math.floor(Math.random() * 1e6))));
     menu!.append(section);
   }
 }
@@ -159,8 +189,27 @@ function draw(now: number): void {
     else if (t === (ts[0] ?? ts[1])) r.thumb(t, 0, g);
   });
   hud!.textContent = `${MODE_NAMES[level!.mode]} · ${game.hud()}`;
-  showBanner(game.banner());
+  showBanner(currentBanner(game, level!));
   if (animate) requestDraw();
+}
+
+/**
+ * The banner to show: the mode's own, with a button to the next level once the level is cleared; else the mode's
+ * intro, until the player first finds or latches onto a square. Records cleared levels and seen intros.
+ */
+function currentBanner(game: GameMode, level: Level): Banner | null {
+  const b = game.banner();
+  if (game.cleared()) {
+    if (level.id) progress.clear(level.id);
+    const next = nextLevel(level);
+    return b && next ? { ...b, action: { label: `Next: ${next.name}`, kind: 'next' } } : b;
+  }
+  if (b) return b;
+  if (intro && game.started()) {
+    intro = false;
+    progress.sawIntro(level.mode);
+  }
+  return intro ? introBanner(level.mode, control, level.goal) : null;
 }
 
 let shownBanner = '';
@@ -184,9 +233,12 @@ function showBanner(b: Banner | null): void {
   if (b.action) {
     const button = document.createElement('button');
     button.type = 'button';
-    button.textContent = b.action;
+    const action = b.action;
+    button.textContent = action.label;
     button.addEventListener('click', () => {
-      game?.restart();
+      const next = level && nextLevel(level);
+      if (action.kind === 'next' && next) start(next);
+      else game?.restart();
       requestDraw();
     });
     banner!.append(button);
@@ -238,10 +290,17 @@ revealButton.addEventListener('click', () => {
   requestDraw();
 });
 
-buildMenu();
 controlButton.textContent = CONTROL_NAMES[control];
 window.addEventListener('resize', resize);
 resize();
-const initial = parseRoute(location.hash);
+// A link to another level on this page changes only the hash; follow it.
+window.addEventListener('hashchange', () => {
+  const next = parseRoute(location.hash);
+  if (next) start(next);
+  else showMenu();
+});
+// A first visit goes straight into the first level; its intro explains the control.
+const initial =
+  parseRoute(location.hash) ?? (LEVELS.some((l) => progress.isCleared(l.id!)) ? null : LEVELS[0]);
 if (initial) start(initial);
 else showMenu();

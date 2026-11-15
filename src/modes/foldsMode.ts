@@ -45,11 +45,13 @@ export class FoldsMode implements GameMode {
     private readonly tolerance: number,
     private readonly grace: number,
     private readonly label: string,
+    /** Seconds held in one round that clear the level, if it has a goal. */
+    private readonly goal?: number,
   ) {
     this.morph = new MorphingCurve(seed);
     this.curve = this.curveAt(0);
     this.tracker = new SquareTracker((t) => this.curveAt(t), 0, findSquares(this.curve));
-    this.game = new AvoidFolds(tolerance, grace);
+    this.game = new AvoidFolds(tolerance, grace, goal);
     try {
       this.worker = new Worker(new URL('../game/solveWorker.ts', import.meta.url), { type: 'module' });
       this.worker.onmessage = (e: MessageEvent<SolveResult>) => this.adopt(e.data);
@@ -129,7 +131,8 @@ export class FoldsMode implements GameMode {
   }
 
   hud(): string {
-    const score = `${this.game.score.toFixed(1)} s held · ${this.game.saves} saved`;
+    const goal = this.goal === undefined ? '' : ` of ${this.goal}`;
+    const score = `${this.game.score.toFixed(1)}${goal} s held · ${this.game.saves} saved`;
     const best = this.best > 0 ? ` · best ${this.best.toFixed(1)} s` : '';
     const where = ` · ${this.label} · ${this.tracker.squares.length} squares`;
     switch (this.state.phase) {
@@ -141,7 +144,17 @@ export class FoldsMode implements GameMode {
         return `${(this.state.graceLeft / 1000).toFixed(1)} s to find another · ${score}`;
       case 'over':
         return `Round over: ${score}${best}`;
+      case 'won':
+        return `Cleared: ${score}`;
     }
+  }
+
+  started(): boolean {
+    return this.state.phase !== 'searching';
+  }
+
+  cleared(): boolean {
+    return this.state.phase === 'won';
   }
 
   banner(): Banner | null {
@@ -149,7 +162,7 @@ export class FoldsMode implements GameMode {
   }
 
   restart(): void {
-    this.game = new AvoidFolds(this.tolerance, this.grace);
+    this.game = new AvoidFolds(this.tolerance, this.grace, this.goal);
     this.state = { phase: 'searching', square: null, graceLeft: 0 };
   }
 
