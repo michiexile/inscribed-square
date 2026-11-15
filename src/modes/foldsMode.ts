@@ -5,7 +5,8 @@ import type { SolveRequest, SolveResult } from '../game/solveWorker';
 import { MorphingCurve } from '../geometry/morph';
 import type { Polygon } from '../geometry/polygon';
 import { type InscribedSquare, findSquares } from '../geometry/solver';
-import { SquareTracker } from '../geometry/tracker';
+import { LeadTracker } from '../geometry/lookahead';
+import { lifeLeft } from '../game/lifeline';
 import type { Renderer } from '../render';
 import { morphStep } from './clock';
 import type { GameMode } from './mode';
@@ -20,11 +21,14 @@ const FADE_MS = 600;
 /**
  * Avoid Folds: the curve morphs; the player latches onto an inscribed square and scores while they stay on it. The
  * tracker follows every square each frame, and a worker's full solves add squares born at folds.
+ *
+ * With a `horizon` it is Lifelines: the tracker runs that many real seconds ahead, so every square shows how long it
+ * has left, and while the player has no square every live square is drawn, so they can choose where to jump.
  */
 export class FoldsMode implements GameMode {
   curve: Polygon;
   private readonly morph: MorphingCurve;
-  private readonly tracker: SquareTracker;
+  private readonly tracker: LeadTracker;
   private game: AvoidFolds;
   private state: FoldsState = { phase: 'searching', square: null, graceLeft: 0 };
   private readonly worker: Worker | null;
@@ -47,10 +51,12 @@ export class FoldsMode implements GameMode {
     private readonly label: string,
     /** Seconds held in one round that clear the level, if it has a goal. */
     private readonly goal?: number,
+    /** Lifelines: how far ahead square lifetimes are known, in real seconds. 0 for Avoid Folds. */
+    private readonly horizon = 0,
   ) {
     this.morph = new MorphingCurve(seed);
     this.curve = this.curveAt(0);
-    this.tracker = new SquareTracker((t) => this.curveAt(t), 0, findSquares(this.curve));
+    this.tracker = new LeadTracker((t) => this.curveAt(t), 0, findSquares(this.curve), horizon * speed);
     this.game = new AvoidFolds(tolerance, grace, goal);
     try {
       this.worker = new Worker(new URL('../game/solveWorker.ts', import.meta.url), { type: 'module' });
@@ -78,14 +84,14 @@ export class FoldsMode implements GameMode {
 
   private adopt(result: SolveResult): void {
     this.solving = false;
-    if (result.time <= this.tracker.time) this.tracker.adopt(result.squares, result.time);
+    if (result.time <= this.tracker.aheadTime) this.tracker.adopt(result.squares, result.time);
   }
 
   private requestSolve(now: number): void {
     if (!this.worker || this.solving || now - this.lastSolve < SOLVE_INTERVAL_MS) return;
     this.solving = true;
     this.lastSolve = now;
-    const request: SolveRequest = { seed: this.seed, time: this.time };
+    const request: SolveRequest = { seed: this.seed, time: this.tracker.aheadTime };
     this.worker.postMessage(request);
   }
 
@@ -109,6 +115,8 @@ export class FoldsMode implements GameMode {
       r.outline(f.square.corners, `rgba(255, 90, 80, ${1 - (now - f.at) / FADE_MS})`, 3);
     }
 
+    if (this.horizon > 0) this.lifelines(r);
+
     const on = this.state.square;
     if (on) {
       // A nearby partner means a fold is coming: the square shifts from green to red as the pair closes, and the
@@ -123,11 +131,31 @@ export class FoldsMode implements GameMode {
     } else if (held) {
       r.loose(this.curve, held.corners, held.free, held.error);
     }
-    if (this.state.phase === 'lost') {
+    // Lifelines draws rings on the squares themselves; a ring at the centre would sit among them.
+    if (this.state.phase === 'lost' && this.horizon === 0) {
       const c = r.toScreen({ x: 0, y: 0 });
       r.ring(c, 30, this.state.graceLeft / this.grace, 'rgba(255, 90, 80, 0.9)');
     }
     return true;
+  }
+
+  /**
+   * Lifelines: the time left of the player's square, and while they have none, every live square as a fuse that burns
+   * down with its time left, so they can pick one that will last.
+   */
+  private lifelines(r: Renderer): void {
+    const choosing = this.state.phase === 'lost' || this.state.phase === 'searching';
+    for (const q of this.tracker.squares) {
+      const mine = q.id === this.state.square?.id;
+      if (!choosing && !mine) continue;
+      const life = lifeLeft(this.tracker.deathOf(q.id), this.time, this.speed, this.horizon);
+      const colour = `hsl(${Math.round(120 * life.fraction)}, 85%, 60%)`;
+      if (!mine) r.fuse(q.square.corners, life.fraction, colour, 3);
+      // The label sits just outside the square's highest corner: centres of different squares often nearly coincide,
+      // corners do not.
+      const top = q.square.corners.map((p) => r.toScreen(p)).reduce((a, b) => (b.y < a.y ? b : a));
+      r.label({ x: top.x, y: top.y - 14 }, life.label, colour);
+    }
   }
 
   hud(): string {

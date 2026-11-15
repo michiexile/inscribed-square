@@ -9,30 +9,33 @@ import { huntProblems } from './validate';
  * - `hunt`: Square Hunt. Find every inscribed square of a still curve.
  * - `folds`: Avoid Folds. Stay on an inscribed square of a morphing curve; when it folds away, jump to another.
  * - `count`: Odd One Out. Square Hunt with the count hidden; the player says when they have found them all.
+ * - `choice`: Lifelines. Avoid Folds where every square shows how long it has left, so where to jump after a fold is
+ *   a choice.
  */
-export type ModeId = 'hunt' | 'folds' | 'count';
+export type ModeId = 'hunt' | 'folds' | 'count' | 'choice';
 
 export const MODE_NAMES: Record<ModeId, string> = {
   hunt: 'Square Hunt',
   folds: 'Avoid Folds',
   count: 'Odd One Out',
+  choice: 'Lifelines',
 };
 
 /** Whether the mode plays on a still curve, `randomCurve(seed)`. */
-export const isStill = (mode: ModeId): boolean => mode !== 'folds';
+export const isStill = (mode: ModeId): boolean => mode === 'hunt' || mode === 'count';
 
 /**
  * A level, or a random curve played in one mode (id null). The seed picks the curve: `randomCurve(seed)` for Square
- * Hunt and Odd One Out, `new MorphingCurve(seed)` for Avoid Folds.
+ * Hunt and Odd One Out, `new MorphingCurve(seed)` for Avoid Folds and Lifelines.
  */
 export interface Level {
   readonly id: string | null;
   readonly name: string;
   readonly mode: ModeId;
   readonly seed: number;
-  /** Avoid Folds only: morph seconds per real second. Default 1. Later levels morph faster. */
+  /** Morphing modes only: morph seconds per real second. Default 1. Later levels morph faster. */
   readonly speed?: number;
-  /** Avoid Folds only: seconds held in one round that clear the level. Random curves have none and run until lost. */
+  /** Morphing modes only: seconds held in one round that clear the level. Random curves have none and run until lost. */
   readonly goal?: number;
 }
 
@@ -46,10 +49,12 @@ export const LEVELS: readonly Level[] = [
   { id: 'count-1', name: 'How many?', mode: 'count', seed: 100 },
   { id: 'folds-1', name: 'Drift', mode: 'folds', seed: 1, goal: 20 },
   { id: 'hunt-3', name: 'Seven squares', mode: 'hunt', seed: 5 },
+  { id: 'choice-1', name: 'Lifeboats', mode: 'choice', seed: 9, goal: 30 },
   { id: 'folds-2', name: 'Undertow', mode: 'folds', seed: 2, speed: 1.5, goal: 25 },
   { id: 'count-2', name: 'Count them all', mode: 'count', seed: 105 },
   { id: 'hunt-4', name: 'Nine squares', mode: 'hunt', seed: 51 },
   { id: 'folds-3', name: 'Churn', mode: 'folds', seed: 5, speed: 2, goal: 30 },
+  { id: 'choice-2', name: 'Crosscurrents', mode: 'choice', seed: 19, speed: 1.5, goal: 40 },
   { id: 'folds-4', name: 'Rapids', mode: 'folds', seed: 3, speed: 3, goal: 30 },
 ];
 
@@ -84,7 +89,7 @@ export function parseRoute(hash: string): Level | null {
   const h = hash.replace(/^#/, '');
   const level = LEVELS.find((l) => l.id === h);
   if (level) return level;
-  const random = /^(hunt|folds|count)\/(\d+)$/.exec(h);
+  const random = /^(hunt|folds|count|choice)\/(\d+)$/.exec(h);
   if (random) return randomLevel(random[1] as ModeId, Number(random[2]));
   if (/^\d+$/.test(h)) return randomLevel('hunt', Number(h));
   return null;

@@ -2,7 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { MorphingCurve } from '../geometry/morph';
 import { findSquares } from '../geometry/solver';
 import { GRACE_MS, TOLERANCE } from './feel';
-import { LEVELS, fitHuntSeed, levelCurve, nextLevel, parseRoute, randomLevel, routeOf } from './levels';
+import {
+  LEVELS,
+  fitHuntSeed,
+  isStill,
+  levelCurve,
+  nextLevel,
+  parseRoute,
+  randomLevel,
+  routeOf,
+} from './levels';
 import { foldTrace, foldsProblems, huntProblems } from './validate';
 
 const COUNT_WORDS: Record<string, number> = { Three: 3, Five: 5, Seven: 7, Nine: 9, Eleven: 11 };
@@ -26,12 +35,12 @@ describe('levels', () => {
   });
 
   it('has every mode, with distinct ids', () => {
-    expect(new Set(LEVELS.map((l) => l.mode))).toEqual(new Set(['hunt', 'folds', 'count']));
+    expect(new Set(LEVELS.map((l) => l.mode))).toEqual(new Set(['hunt', 'folds', 'count', 'choice']));
     expect(new Set(LEVELS.map((l) => l.id)).size).toBe(LEVELS.length);
   });
 
-  it('gives every Avoid Folds level a fold within its first 20 seconds', () => {
-    for (const level of LEVELS.filter((l) => l.mode === 'folds')) {
+  it('gives every morphing level a fold within its first 20 seconds', () => {
+    for (const level of LEVELS.filter((l) => !isStill(l.mode))) {
       const morph = new MorphingCurve(level.seed!);
       const counts = new Set<number>();
       // Stop at the first change: one fold is all the test needs, and each full solve costs tens of milliseconds.
@@ -58,10 +67,10 @@ describe('levels', () => {
     }
   }, 60_000);
 
-  it("never strands a player in the first minute of an Avoid Folds level, at the level's own speed", () => {
+  it("never strands a player in the first minute of a morphing level, at the level's own speed", () => {
     // After every fold, some square is alive within the grace time and lives at least a second after it, both in
     // real seconds.
-    for (const level of LEVELS.filter((l) => l.mode === 'folds')) {
+    for (const level of LEVELS.filter((l) => !isStill(l.mode))) {
       const speed = level.speed ?? 1;
       const trace = foldTrace(new MorphingCurve(level.seed), 60 * speed, 0.5);
       expect(foldsProblems(trace, speed, GRACE_MS / 1000, 1), level.id!).toEqual([]);
@@ -109,10 +118,29 @@ describe('levels', () => {
   });
 
   it('gives every Avoid Folds level a goal, and asks for longer holds as the levels go on', () => {
-    const goals = LEVELS.filter((l) => l.mode === 'folds').map((l) => l.goal);
-    for (const g of goals) expect(g).toBeGreaterThan(0);
-    for (let i = 1; i < goals.length; i++) expect(goals[i]!).toBeGreaterThanOrEqual(goals[i - 1]!);
+    for (const mode of ['folds', 'choice'] as const) {
+      const goals = LEVELS.filter((l) => l.mode === mode).map((l) => l.goal);
+      expect(goals.length, mode).toBeGreaterThan(0);
+      for (const g of goals) expect(g, mode).toBeGreaterThan(0);
+      for (let i = 1; i < goals.length; i++) expect(goals[i]!, mode).toBeGreaterThanOrEqual(goals[i - 1]!);
+    }
     expect(randomLevel('folds', 3).goal).toBeUndefined();
+  });
+
+  it('keeps at least three squares alive on every Lifelines curve, so a fold always leaves a choice', () => {
+    for (const level of LEVELS.filter((l) => l.mode === 'choice')) {
+      const morph = new MorphingCurve(level.seed);
+      const speed = level.speed ?? 1;
+      for (let real = 0; real < 60; real += 2)
+        expect(findSquares(morph.at(real * speed)).length, `${level.id} at ${real} s`).toBeGreaterThanOrEqual(
+          3,
+        );
+    }
+  }, 60_000);
+
+  it('plays an Avoid Folds level before the first Lifelines level, which adds a choice to it', () => {
+    const first = LEVELS.findIndex((l) => l.mode === 'choice');
+    expect(LEVELS.slice(0, first).some((l) => l.mode === 'folds')).toBe(true);
   });
 
   it('moves a random Square Hunt seed on to the next curve that passes validation', () => {

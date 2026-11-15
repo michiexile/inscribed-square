@@ -83,6 +83,16 @@ export function introBanner(mode: ModeId, control: Control, goal: number | undef
   }
   const target =
     goal === undefined ? 'Hold on as long as you can.' : `Hold on for ${goal} s to clear the level.`;
+  if (mode === 'choice') {
+    return {
+      title: 'Choose your lifeline',
+      detail:
+        `The curve moves, and its squares drift. ${hold} Each square shows how long it has left. When yours ` +
+        `vanishes, the others appear: pick one that will last, and get onto it within ${GRACE_MS / 1000} seconds. ` +
+        target,
+      tone: 'info',
+    };
+  }
   return {
     title: 'Keep your square',
     detail:

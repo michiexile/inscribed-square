@@ -51,7 +51,9 @@ https://claude.ai/artifact/CqdHHDvThUbNKJiYkcmq2t, partly superseded).
   (`.claude/WORKLOG-tracking.md`).
 - Game modes are separate and retained (project lead, 2026-11-09): each level in `src/game/levels.ts` launches one
   mode (`src/modes/`: Square Hunt, Avoid Folds, and Odd One Out, which is `HuntMode` with the count hidden until a
-  right claim, `src/game/count.ts`; its messages never reveal the count before then). `LEVELS` is the campaign in play order (Next level follows it; a first
+  right claim, `src/game/count.ts`; its messages never reveal the count before then; and Lifelines, which is `FoldsMode`
+  with a horizon: `LeadTracker` (`src/geometry/lookahead.ts`) runs the tracker that far ahead of the display so each
+  square's death time is known, and full solves for it are made at its `aheadTime`). `LEVELS` is the campaign in play order (Next level follows it; a first
   visit with no progress starts at `LEVELS[0]`); Avoid Folds levels clear at their `goal` seconds held in one round.
   Progress (cleared levels, seen intros) lives in `src/game/progress.ts` and must survive blocked or junk storage. Mode rules live in DOM-free classes in `src/game/` (`hunt.ts`,
   `folds.ts`); feel constants are guesses tracked in #5 and #12 (those the validator needs live in `src/game/feel.ts`).
@@ -69,7 +71,8 @@ https://claude.ai/artifact/CqdHHDvThUbNKJiYkcmq2t, partly superseded).
 - Level curves must be generic: symmetric curves inscribe continuous families of squares (#2), and polygon parity
   is unverified (#1). Every shipped level passes `src/game/validate.ts` in `levels.test.ts`: Square Hunt curves are
   generic, odd, stable at grid 512, match their name's count, and have no two squares within `TOLERANCE` of each
-  other; Avoid Folds levels never strand the player after a fold (60 real seconds at the level's `speed`, grace and
+  other; Avoid Folds and Lifelines levels never strand the player after a fold, and Lifelines curves keep at least
+  three squares (60 real seconds at the level's `speed`, grace and
   hold in real seconds; `.claude/WORKLOG-morph-speed.md`). Random Square Hunt seeds go through
   `fitHuntSeed`; random Avoid Folds seeds are not validated (`.claude/WORKLOG-level-validation.md`).
 

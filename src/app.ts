@@ -1,6 +1,6 @@
 import { type Banner, introBanner } from './game/banner';
 import { CONTROL_NAMES, type Control, DEFAULT_CONTROL, HeldSquare } from './game/control';
-import { GRACE_MS, TOLERANCE } from './game/feel';
+import { GRACE_MS, LIFELINE_HORIZON, TOLERANCE } from './game/feel';
 import {
   LEVELS,
   type Level,
@@ -84,7 +84,15 @@ function start(next: Level): void {
   const label = next.id ? next.name : `random curve ${next.seed}`;
   game = isStill(next.mode)
     ? new HuntMode(levelCurve(next), TOLERANCE, DWELL_MS, label, next.mode === 'count')
-    : new FoldsMode(next.seed, next.speed ?? 1, TOLERANCE, GRACE_MS, label, next.goal);
+    : new FoldsMode(
+        next.seed,
+        next.speed ?? 1,
+        TOLERANCE,
+        GRACE_MS,
+        label,
+        next.goal,
+        next.mode === 'choice' ? LIFELINE_HORIZON : 0,
+      );
   intro = !progress.hasSeenIntro(next.mode);
   heldSquare.reset();
   history.replaceState(null, '', routeOf(next));
@@ -131,7 +139,7 @@ function buildMenu(): void {
       'primary';
     menu!.append(section);
   }
-  for (const mode of ['hunt', 'count', 'folds'] as ModeId[]) {
+  for (const mode of ['hunt', 'count', 'folds', 'choice'] as ModeId[]) {
     const section = document.createElement('section');
     const heading = document.createElement('h2');
     heading.textContent = MODE_NAMES[mode];

@@ -100,3 +100,13 @@ describe('introBanner for Odd One Out', () => {
     expect(b.detail).toMatch(/two thumbs/i);
   });
 });
+
+describe('introBanner for Lifelines', () => {
+  it('says each square shows its time left, and names the goal and grace time', () => {
+    const b = introBanner('choice', 'centre', 30);
+    expect(b.detail).toMatch(/how long/i);
+    expect(b.detail).toMatch(/30 s/);
+    expect(b.detail).toMatch(/3 seconds/);
+    expect(b.detail).toMatch(/one finger/i);
+  });
+});
