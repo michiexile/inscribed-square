@@ -25,8 +25,8 @@ describe('levels', () => {
     expect(parseRoute('#folds/abc')).toBeNull();
   });
 
-  it('has both modes, with distinct ids', () => {
-    expect(new Set(LEVELS.map((l) => l.mode))).toEqual(new Set(['hunt', 'folds']));
+  it('has every mode, with distinct ids', () => {
+    expect(new Set(LEVELS.map((l) => l.mode))).toEqual(new Set(['hunt', 'folds', 'count']));
     expect(new Set(LEVELS.map((l) => l.id)).size).toBe(LEVELS.length);
   });
 
@@ -72,6 +72,29 @@ describe('levels', () => {
     const speeds = LEVELS.filter((l) => l.mode === 'folds').map((l) => l.speed ?? 1);
     expect(speeds[0]).toBe(1);
     for (let i = 1; i < speeds.length; i++) expect(speeds[i]).toBeGreaterThan(speeds[i - 1]);
+  });
+
+  it('validates every Odd One Out level like Square Hunt, with a name that gives no count away', () => {
+    const counts = LEVELS.filter((l) => l.mode === 'count');
+    expect(counts.length).toBeGreaterThan(0);
+    for (const level of counts) {
+      const curve = levelCurve(level);
+      const squares = findSquares(curve);
+      expect(huntProblems(curve, squares, TOLERANCE), level.id!).toEqual([]);
+      expect(squares.length, level.id!).toBeGreaterThan(3);
+      expect(findSquares(curve, { grid: 512 }).length, level.id!).toBe(squares.length);
+      expect(level.name, level.id!).not.toMatch(/\d|three|five|seven|nine|eleven/i);
+    }
+  }, 60_000);
+
+  it('plays two Square Hunt levels, whose names show odd counts, before the first Odd One Out level', () => {
+    const first = LEVELS.findIndex((l) => l.mode === 'count');
+    expect(LEVELS.slice(0, first).filter((l) => l.mode === 'hunt').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('round-trips random Odd One Out curves through the URL hash', () => {
+    const random = randomLevel('count', 42);
+    expect(parseRoute(routeOf(random))).toEqual(random);
   });
 
   it('opens the campaign on a still curve, so the control is learnt before the curve moves', () => {

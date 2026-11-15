@@ -22,6 +22,8 @@ export interface GameMode {
   cleared(): boolean;
   /** A large message the player must not miss, or null. */
   banner(): Banner | null;
+  /** Odd One Out only: the player says they have found every square, at time `now` (milliseconds). */
+  claim?(now: number): void;
   /** Starts the level over, after its banner's button is pressed. */
   restart(): void;
   /** Called when every thumb has lifted. */

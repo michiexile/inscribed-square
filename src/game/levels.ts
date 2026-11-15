@@ -8,14 +8,22 @@ import { huntProblems } from './validate';
  * The game modes. Each level launches one of them.
  * - `hunt`: Square Hunt. Find every inscribed square of a still curve.
  * - `folds`: Avoid Folds. Stay on an inscribed square of a morphing curve; when it folds away, jump to another.
+ * - `count`: Odd One Out. Square Hunt with the count hidden; the player says when they have found them all.
  */
-export type ModeId = 'hunt' | 'folds';
+export type ModeId = 'hunt' | 'folds' | 'count';
 
-export const MODE_NAMES: Record<ModeId, string> = { hunt: 'Square Hunt', folds: 'Avoid Folds' };
+export const MODE_NAMES: Record<ModeId, string> = {
+  hunt: 'Square Hunt',
+  folds: 'Avoid Folds',
+  count: 'Odd One Out',
+};
+
+/** Whether the mode plays on a still curve, `randomCurve(seed)`. */
+export const isStill = (mode: ModeId): boolean => mode !== 'folds';
 
 /**
  * A level, or a random curve played in one mode (id null). The seed picks the curve: `randomCurve(seed)` for Square
- * Hunt, `new MorphingCurve(seed)` for Avoid Folds.
+ * Hunt and Odd One Out, `new MorphingCurve(seed)` for Avoid Folds.
  */
 export interface Level {
   readonly id: string | null;
@@ -30,14 +38,16 @@ export interface Level {
 
 /**
  * The campaign, in the order it is played. It opens with two still curves so the control is learnt before the curve
- * moves, then alternates modes. Goals are guesses (#12).
+ * moves; their names show odd counts before the first Odd One Out level hides the count. Goals are guesses (#12).
  */
 export const LEVELS: readonly Level[] = [
   { id: 'hunt-1', name: 'Three squares', mode: 'hunt', seed: 1 },
   { id: 'hunt-2', name: 'Five squares', mode: 'hunt', seed: 2 },
+  { id: 'count-1', name: 'How many?', mode: 'count', seed: 100 },
   { id: 'folds-1', name: 'Drift', mode: 'folds', seed: 1, goal: 20 },
   { id: 'hunt-3', name: 'Seven squares', mode: 'hunt', seed: 5 },
   { id: 'folds-2', name: 'Undertow', mode: 'folds', seed: 2, speed: 1.5, goal: 25 },
+  { id: 'count-2', name: 'Count them all', mode: 'count', seed: 105 },
   { id: 'hunt-4', name: 'Nine squares', mode: 'hunt', seed: 51 },
   { id: 'folds-3', name: 'Churn', mode: 'folds', seed: 5, speed: 2, goal: 30 },
   { id: 'folds-4', name: 'Rapids', mode: 'folds', seed: 3, speed: 3, goal: 30 },
@@ -63,7 +73,7 @@ export function fitHuntSeed(seed: number): number {
   }
 }
 
-/** The still curve of a Square Hunt level. */
+/** The still curve of a Square Hunt or Odd One Out level. */
 export const levelCurve = (level: Level): Polygon => randomCurve(level.seed);
 
 /** The URL hash for a level: `#hunt-2` for a level, `#folds/123` for a random curve. */
@@ -74,7 +84,7 @@ export function parseRoute(hash: string): Level | null {
   const h = hash.replace(/^#/, '');
   const level = LEVELS.find((l) => l.id === h);
   if (level) return level;
-  const random = /^(hunt|folds)\/(\d+)$/.exec(h);
+  const random = /^(hunt|folds|count)\/(\d+)$/.exec(h);
   if (random) return randomLevel(random[1] as ModeId, Number(random[2]));
   if (/^\d+$/.test(h)) return randomLevel('hunt', Number(h));
   return null;
