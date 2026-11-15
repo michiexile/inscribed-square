@@ -43,6 +43,19 @@ describe('Progress', () => {
     expect(after.hasSeenIntro('folds')).toBe(false);
   });
 
+  it('remembers the chosen control, and has none before the player picks one', () => {
+    const store = new MemoryStore();
+    expect(new Progress(store).control()).toBeNull();
+    new Progress(store).setControl('corners');
+    expect(new Progress(store).control()).toBe('corners');
+  });
+
+  it('ignores a stored control it does not know', () => {
+    const store = new MemoryStore();
+    store.setItem(Progress.KEY, '{"cleared":[],"intros":[],"control":"telepathy"}');
+    expect(new Progress(store).control()).toBeNull();
+  });
+
   it('continues at the first uncleared level in campaign order, not the first after the last cleared', () => {
     const p = new Progress(new MemoryStore());
     expect(p.next(LEVELS)).toBe(LEVELS[0]);

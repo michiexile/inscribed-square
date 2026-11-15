@@ -1,4 +1,5 @@
 import type { Control } from './control';
+import type { LastClaim } from './count';
 import { GRACE_MS } from './feel';
 import type { Phase } from './folds';
 import type { ModeId } from './levels';
@@ -63,7 +64,16 @@ export function introBanner(mode: ModeId, control: Control, goal: number | undef
   const hold =
     control === 'corners'
       ? 'Put two thumbs on the screen: each one slides a corner of a square along the curve.'
-      : 'Drag one thumb to move a square around; it fits itself to the curve.';
+      : 'Drag one finger to move a square around; it fits itself to the curve.';
+  if (mode === 'count') {
+    return {
+      title: 'How many squares?',
+      detail:
+        `This time we won't say how many squares the curve has. ${hold} Find the squares, then tap That's all ` +
+        'when you think you have every one.',
+      tone: 'info',
+    };
+  }
   if (mode === 'hunt') {
     return {
       title: 'Find the squares',
@@ -80,4 +90,32 @@ export function introBanner(mode: ModeId, control: Control, goal: number | undef
       `find another within ${GRACE_MS / 1000} seconds. ${target}`,
     tone: 'info',
   };
+}
+
+/** How long the message after a wrong claim stays up, in milliseconds. */
+export const CLAIM_MESSAGE_MS = 3000;
+
+/**
+ * The Odd One Out banner: the result of a wrong claim for a few seconds, never giving the count away, and the count
+ * once the level is cleared.
+ */
+export function countBanner(
+  last: LastClaim | null,
+  now: number,
+  cleared: boolean,
+  total: number,
+  wrong: number,
+): Banner | null {
+  if (cleared) {
+    const detail = wrong === 0 ? 'First try' : `After ${wrong} wrong guess${wrong === 1 ? '' : 'es'}`;
+    return { title: `All ${total} found!`, detail, tone: 'win' };
+  }
+  if (!last || last.result.right || now - last.at >= CLAIM_MESSAGE_MS) return null;
+  const detail =
+    last.found === 0
+      ? 'Find a square first.'
+      : last.result.even
+        ? `${last.found} is even. Look again.`
+        : 'There are more to find.';
+  return { title: 'Not yet', detail, tone: 'warn' };
 }

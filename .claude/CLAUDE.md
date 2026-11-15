@@ -31,8 +31,9 @@ A game based on Toeplitz's inscribed square problem.
 
 ## Architecture
 
-TypeScript, Vite, HTML canvas; Vitest for tests; ESLint and Prettier. Mobile builds will wrap the web app with
-Capacitor, Steam with Electron or Tauri (plan doc: https://claude.ai/artifact/CqdHHDvThUbNKJiYkcmq2t).
+TypeScript, Vite, HTML canvas; Vitest for tests; ESLint and Prettier. Targets are the browser and itch.io; app stores
+are dropped for now, and the repo stays public under MIT (project lead, 2026-11-15; plan doc:
+https://claude.ai/artifact/CqdHHDvThUbNKJiYkcmq2t, partly superseded).
 
 - `src/geometry/`: pure geometry with no DOM access. Every curve implements `ClosedCurve` (`curve.ts`: arc-length
   parameter in [0, 1), `point`, `nearest`), so the solver never depends on whether a curve is a polygon or a spline.
@@ -49,11 +50,13 @@ Capacitor, Steam with Electron or Tauri (plan doc: https://claude.ai/artifact/Cq
   are invisible locally, so `adopt` merges background full solves. Each tracker sub-step is at most 1/60 s
   (`.claude/WORKLOG-tracking.md`).
 - Game modes are separate and retained (project lead, 2026-11-09): each level in `src/game/levels.ts` launches one
-  mode (`src/modes/`: Square Hunt, Avoid Folds). `LEVELS` is the campaign in play order (Next level follows it; a first
+  mode (`src/modes/`: Square Hunt, Avoid Folds, and Odd One Out, which is `HuntMode` with the count hidden until a
+  right claim, `src/game/count.ts`; its messages never reveal the count before then). `LEVELS` is the campaign in play order (Next level follows it; a first
   visit with no progress starts at `LEVELS[0]`); Avoid Folds levels clear at their `goal` seconds held in one round.
   Progress (cleared levels, seen intros) lives in `src/game/progress.ts` and must survive blocked or junk storage. Mode rules live in DOM-free classes in `src/game/` (`hunt.ts`,
   `folds.ts`); feel constants are guesses tracked in #5 and #12 (those the validator needs live in `src/game/feel.ts`).
-- `src/geometry/square.ts` (control 1) and `centre.ts` (control 2) build the held square; `src/game/hunt.ts` counts a
+- `src/geometry/square.ts` (control 1) and `centre.ts` (control 2) build the held square; drag the centre is the
+  default (`DEFAULT_CONTROL`, project lead, 2026-11-15) and the player's choice is saved in `Progress`; `src/game/hunt.ts` counts a
   held square only after Newton refinement confirms a real inscribed square near it, because a within-tolerance held
   square can be a near-miss (`.claude/WORKLOG-playtest-1.md`), and only after a dwell on that square, so scrubbing
   does not collect squares (`.claude/WORKLOG-dwell.md`).

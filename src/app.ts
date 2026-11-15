@@ -1,5 +1,5 @@
 import { type Banner, introBanner } from './game/banner';
-import { CONTROL_NAMES, type Control, HeldSquare } from './game/control';
+import { CONTROL_NAMES, type Control, DEFAULT_CONTROL, HeldSquare } from './game/control';
 import { GRACE_MS, TOLERANCE } from './game/feel';
 import {
   LEVELS,
@@ -7,6 +7,7 @@ import {
   MODE_NAMES,
   type ModeId,
   fitHuntSeed,
+  isStill,
   levelCurve,
   nextLevel,
   parseRoute,
@@ -30,7 +31,18 @@ const levelsButton = document.querySelector<HTMLButtonElement>('#levels');
 const controlButton = document.querySelector<HTMLButtonElement>('#mode');
 const newButton = document.querySelector<HTMLButtonElement>('#new');
 const revealButton = document.querySelector<HTMLButtonElement>('#reveal');
-if (!canvas || !hud || !banner || !menu || !levelsButton || !controlButton || !newButton || !revealButton)
+const claimButton = document.querySelector<HTMLButtonElement>('#claim');
+if (
+  !canvas ||
+  !hud ||
+  !banner ||
+  !menu ||
+  !levelsButton ||
+  !controlButton ||
+  !newButton ||
+  !revealButton ||
+  !claimButton
+)
   throw new Error('Missing page elements');
 const ctx = canvas.getContext('2d');
 if (!ctx) throw new Error('2D canvas not supported');
@@ -42,7 +54,6 @@ const DWELL_MS = 500;
  */
 const GRAB_OFFSET = 80;
 
-let control: Control = 'corners';
 let reveal = false;
 let level: Level | null = null;
 let game: GameMode | null = null;
@@ -62,18 +73,18 @@ function storage(): KeyValueStore | null {
   }
 }
 const progress = new Progress(storage());
+let control: Control = progress.control() ?? DEFAULT_CONTROL;
 /** Whether this level shows its mode's intro until the player starts: only until they have seen it once. */
 let intro = false;
 
 function start(next: Level): void {
   game?.dispose();
-  if (next.id === null && next.mode === 'hunt') next = { ...next, seed: fitHuntSeed(next.seed) };
+  if (next.id === null && isStill(next.mode)) next = { ...next, seed: fitHuntSeed(next.seed) };
   level = next;
   const label = next.id ? next.name : `random curve ${next.seed}`;
-  game =
-    next.mode === 'hunt'
-      ? new HuntMode(levelCurve(next), TOLERANCE, DWELL_MS, label)
-      : new FoldsMode(next.seed, next.speed ?? 1, TOLERANCE, GRACE_MS, label, next.goal);
+  game = isStill(next.mode)
+    ? new HuntMode(levelCurve(next), TOLERANCE, DWELL_MS, label, next.mode === 'count')
+    : new FoldsMode(next.seed, next.speed ?? 1, TOLERANCE, GRACE_MS, label, next.goal);
   intro = !progress.hasSeenIntro(next.mode);
   heldSquare.reset();
   history.replaceState(null, '', routeOf(next));
@@ -89,6 +100,7 @@ function showMenu(): void {
   buildMenu();
   menu!.hidden = false;
   hud!.textContent = '';
+  claimButton!.hidden = true;
   showBanner(null);
   clear();
 }
@@ -119,7 +131,7 @@ function buildMenu(): void {
       'primary';
     menu!.append(section);
   }
-  for (const mode of ['hunt', 'folds'] as ModeId[]) {
+  for (const mode of ['hunt', 'count', 'folds'] as ModeId[]) {
     const section = document.createElement('section');
     const heading = document.createElement('h2');
     heading.textContent = MODE_NAMES[mode];
@@ -189,6 +201,7 @@ function draw(now: number): void {
     else if (t === (ts[0] ?? ts[1])) r.thumb(t, 0, g);
   });
   hud!.textContent = `${MODE_NAMES[level!.mode]} · ${game.hud()}`;
+  claimButton!.hidden = !game.claim || game.cleared();
   showBanner(currentBanner(game, level!));
   if (animate) requestDraw();
 }
@@ -277,12 +290,17 @@ for (const type of ['pointerup', 'pointercancel'] as const) {
 levelsButton.addEventListener('click', showMenu);
 controlButton.addEventListener('click', () => {
   control = control === 'corners' ? 'centre' : 'corners';
+  progress.setControl(control);
   controlButton.textContent = CONTROL_NAMES[control];
   heldSquare.reset();
   requestDraw();
 });
 newButton.addEventListener('click', () => {
   start(randomLevel(level?.mode ?? 'hunt', Math.floor(Math.random() * 1e6)));
+});
+claimButton.addEventListener('click', () => {
+  game?.claim?.(performance.now());
+  requestDraw();
 });
 revealButton.addEventListener('click', () => {
   reveal = !reveal;

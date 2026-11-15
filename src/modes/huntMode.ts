@@ -1,13 +1,21 @@
-import { type Banner, huntBanner } from '../game/banner';
+import { type Banner, CLAIM_MESSAGE_MS, countBanner, huntBanner } from '../game/banner';
 import type { Held } from '../game/control';
+import { Claims } from '../game/count';
 import { type Hold, Hunt } from '../game/hunt';
 import type { Polygon } from '../geometry/polygon';
 import { findSquares } from '../geometry/solver';
 import type { Renderer } from '../render';
 import type { GameMode } from './mode';
 
-/** Square Hunt: find every inscribed square of a still curve, holding each for the dwell time. */
+/**
+ * Square Hunt: find every inscribed square of a still curve, holding each for the dwell time. With `hideCount` it is
+ * Odd One Out: the count stays hidden until the player claims they have found every square.
+ */
 export class HuntMode implements GameMode {
+  private readonly claims = new Claims();
+  private now = 0;
+  /** Present only in Odd One Out, so the app shows the That's all button only there. */
+  readonly claim?: (now: number) => void;
   private readonly hunt: Hunt;
   private readonly solveMs: number;
   private lastFound = 0;
@@ -19,15 +27,18 @@ export class HuntMode implements GameMode {
     tolerance: number,
     dwell: number,
     private readonly label: string,
+    private readonly hideCount = false,
   ) {
     const t0 = performance.now();
     this.hunt = new Hunt(curve, findSquares(curve), tolerance, dwell);
     this.solveMs = performance.now() - t0;
+    if (hideCount) this.claim = (now) => void this.claims.claim(this.hunt.found.length, this.total, now);
   }
 
   advance(): void {}
 
   frame(r: Renderer, held: Held | null, now: number, reveal: boolean): boolean {
+    this.now = now;
     r.curve(this.curve.vertices);
     for (const q of this.hunt.found) r.fill(q.corners, 'rgba(102, 220, 120, 0.12)');
     if (reveal)
@@ -45,11 +56,18 @@ export class HuntMode implements GameMode {
     }
     if (this.hunt.found.length > this.lastFound) navigator.vibrate?.(40);
     this.lastFound = this.hunt.found.length;
-    // Keep animating while a dwell is under way, even if the thumbs are still.
-    return snapped !== null && this.hold.progress < 1;
+    // Keep animating while a dwell is under way, even if the thumbs are still, and until a claim's message fades.
+    const claimShowing = this.claims.last !== null && now - this.claims.last.at < CLAIM_MESSAGE_MS;
+    return (snapped !== null && this.hold.progress < 1) || claimShowing;
+  }
+
+  /** The curve's square count as far as anyone knows: the solver's, plus any it missed that the player found. */
+  private get total(): number {
+    return this.hunt.squares.length + this.hunt.extra;
   }
 
   hud(): string {
+    if (this.hideCount) return `Found ${this.hunt.found.length} · ${this.label}`;
     const extra = this.hunt.extra > 0 ? ` (${this.hunt.extra} the solver missed)` : '';
     const err =
       this.error === null ? '' : ` · error ${this.error.toFixed(3)}${this.hold.progress >= 1 ? ' ✓' : ''}`;
@@ -64,10 +82,13 @@ export class HuntMode implements GameMode {
   }
 
   cleared(): boolean {
+    if (this.hideCount) return this.claims.cleared;
     return this.hunt.squares.length > 0 && this.hunt.found.length >= this.hunt.squares.length;
   }
 
   banner(): Banner | null {
+    if (this.hideCount)
+      return countBanner(this.claims.last, this.now, this.claims.cleared, this.total, this.claims.wrong);
     return huntBanner(this.hunt.found.length, this.hunt.squares.length);
   }
 

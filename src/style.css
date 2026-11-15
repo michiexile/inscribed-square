@@ -41,6 +41,15 @@ body {
   padding: 10px 12px;
 }
 
+#bar button[hidden] {
+  display: none;
+}
+
+#bar #claim {
+  background: #1e3a2a;
+  border-color: #66dc78;
+}
+
 #bar button[aria-pressed='true'] {
   background: #3b2f52;
   border-color: #c8a0ff;

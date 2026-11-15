@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { foldsBanner, huntBanner, introBanner } from './banner';
+import { countBanner, foldsBanner, huntBanner, introBanner } from './banner';
 
 describe('foldsBanner', () => {
   it('shows nothing while searching or holding', () => {
@@ -36,9 +36,9 @@ describe('huntBanner', () => {
 });
 
 describe('introBanner', () => {
-  it('explains the control actually in use: two thumbs for corners, one for the centre', () => {
+  it('explains the control actually in use: two thumbs for corners, one finger for the centre', () => {
     expect(introBanner('hunt', 'corners', undefined).detail).toMatch(/two thumbs/i);
-    expect(introBanner('hunt', 'centre', undefined).detail).toMatch(/one thumb/i);
+    expect(introBanner('hunt', 'centre', undefined).detail).toMatch(/one finger/i);
   });
 
   it("tells Avoid Folds players the level's goal and the grace time", () => {
@@ -46,5 +46,57 @@ describe('introBanner', () => {
     expect(b.detail).toMatch(/20 s/);
     expect(b.detail).toMatch(/3 seconds/);
     expect(b.tone).toBe('info');
+  });
+});
+
+describe('countBanner', () => {
+  const wrong = (found: number, even: boolean, at = 0) => ({
+    result: { right: false as const, even },
+    at,
+    found,
+  });
+
+  it('never shows the count before the level is cleared', () => {
+    expect(countBanner(null, 0, false, 5, 0)).toBeNull();
+    const b = countBanner(wrong(4, true), 100, false, 5, 1);
+    expect(JSON.stringify(b)).not.toMatch(/5/);
+  });
+
+  it('points at an even count after a wrong claim, without saying how many are left', () => {
+    const b = countBanner(wrong(4, true), 100, false, 5, 1);
+    expect(b?.tone).toBe('warn');
+    expect(b?.detail).toMatch(/4 is even/);
+  });
+
+  it('says only that there are more after a short odd count', () => {
+    const b = countBanner(wrong(3, false), 100, false, 5, 1);
+    expect(b?.detail).not.toMatch(/even|odd/);
+  });
+
+  it('asks for a square first after claiming with none found', () => {
+    expect(countBanner(wrong(0, true), 100, false, 5, 1)?.detail).not.toMatch(/even/);
+  });
+
+  it('lets a wrong-claim message fade after a few seconds', () => {
+    expect(countBanner(wrong(4, true), 2000, false, 5, 1)).not.toBeNull();
+    expect(countBanner(wrong(4, true), 5000, false, 5, 1)).toBeNull();
+  });
+
+  it('shows the count once cleared, with the wrong guesses', () => {
+    expect(countBanner(null, 0, true, 5, 0)).toMatchObject({
+      title: 'All 5 found!',
+      detail: 'First try',
+      tone: 'win',
+    });
+    expect(countBanner(null, 0, true, 5, 2)?.detail).toBe('After 2 wrong guesses');
+    expect(countBanner(null, 0, true, 5, 1)?.detail).toBe('After 1 wrong guess');
+  });
+});
+
+describe('introBanner for Odd One Out', () => {
+  it("names the That's all button and hides the count", () => {
+    const b = introBanner('count', 'corners', undefined);
+    expect(b.detail).toMatch(/That's all/);
+    expect(b.detail).toMatch(/two thumbs/i);
   });
 });
