@@ -21,6 +21,7 @@ import { uiScale } from './input/scale';
 import { FoldsMode } from './modes/foldsMode';
 import { HuntMode } from './modes/huntMode';
 import { PredictMode } from './modes/predictMode';
+import { SteerMode } from './modes/steerMode';
 import type { GameMode } from './modes/mode';
 import { Renderer } from './render';
 
@@ -87,15 +88,17 @@ function start(next: Level): void {
     ? new HuntMode(levelCurve(next), TOLERANCE, DWELL_MS, label, next.mode === 'count')
     : next.mode === 'predict'
       ? new PredictMode(next.seed, next.warning, next.rounds, next.goal, label)
-      : new FoldsMode(
-          next.seed,
-          next.speed ?? 1,
-          TOLERANCE,
-          GRACE_MS,
-          label,
-          next.goal,
-          next.mode === 'choice' ? LIFELINE_HORIZON : 0,
-        );
+      : next.mode === 'steer'
+        ? new SteerMode(next.seed, next.keeper, next.targets, label)
+        : new FoldsMode(
+            next.seed,
+            next.speed ?? 1,
+            TOLERANCE,
+            GRACE_MS,
+            label,
+            next.goal,
+            next.mode === 'choice' ? LIFELINE_HORIZON : 0,
+          );
   intro = !progress.hasSeenIntro(next.mode);
   heldSquare.reset();
   history.replaceState(null, '', routeOf(next));
@@ -142,7 +145,7 @@ function buildMenu(): void {
       'primary';
     menu!.append(section);
   }
-  for (const mode of ['hunt', 'count', 'folds', 'choice', 'predict'] as ModeId[]) {
+  for (const mode of ['hunt', 'count', 'folds', 'choice', 'predict', 'steer'] as ModeId[]) {
     const section = document.createElement('section');
     const heading = document.createElement('h2');
     heading.textContent = MODE_NAMES[mode];
@@ -194,24 +197,29 @@ function draw(now: number): void {
   if (!game) return;
   const { toScreen, toCurve } = view();
   clear();
-  game.advance(now);
-  const curve = game.curve;
   const ts = thumbs.thumbs();
   const grab = ts.map((t) => (t ? { x: t.x, y: t.y - GRAB_OFFSET } : null));
-  const held = game.tapOnly
-    ? null
-    : heldSquare.update(
-        curve,
-        control,
-        grab.map((g) => (g ? toCurve(g) : null)),
-      );
+  // A mode that takes the finger directly gets the first finger's point, and no held square.
+  const first = grab[0] ?? grab[1];
+  const direct = game.pointer !== undefined;
+  game.pointer?.(first ? toCurve(first) : null);
+  game.advance(now);
+  const curve = game.curve;
+  const held =
+    game.tapOnly || game.pointer
+      ? null
+      : heldSquare.update(
+          curve,
+          control,
+          grab.map((g) => (g ? toCurve(g) : null)),
+        );
   const r = new Renderer(ctx!, toScreen, TOLERANCE);
   const animate = game.frame(r, held, now, reveal);
   if (!game.tapOnly)
     ts.forEach((t, i) => {
       if (!t) return;
       const g = grab[i]!;
-      if (control === 'corners') r.thumb(t, i, toScreen(curve.nearest(toCurve(g)).point));
+      if (control === 'corners' && !direct) r.thumb(t, i, toScreen(curve.nearest(toCurve(g)).point));
       else if (t === (ts[0] ?? ts[1])) r.thumb(t, 0, g);
     });
   hud!.textContent = `${MODE_NAMES[level!.mode]} · ${game.hud()}`;

@@ -1,6 +1,7 @@
 import type { Control } from './control';
 import type { LastClaim } from './count';
 import type { PredictPhase } from './predict';
+import type { SteerState } from './steer';
 import { GRACE_MS } from './feel';
 import type { Phase } from './folds';
 import type { ModeId } from './levels';
@@ -66,6 +67,15 @@ export function introBanner(mode: ModeId, control: Control, goal: number | undef
     control === 'corners'
       ? 'Put two thumbs on the screen: each one slides a corner of a square along the curve.'
       : 'Drag one finger to move a square around; it fits itself to the curve.';
+  if (mode === 'steer') {
+    return {
+      title: 'Steer the curve',
+      detail:
+        'Drag with one finger: the curve stretches toward it. Make the red square vanish, but keep the gold one. ' +
+        'Squares vanish in pairs, when two of them meet.',
+      tone: 'info',
+    };
+  }
   if (mode === 'predict') {
     return {
       title: 'Which two fold?',
@@ -162,4 +172,19 @@ export function predictBanner(state: {
     tone: 'over',
     action: { label: 'Play again', kind: 'again' },
   };
+}
+
+/** The Steer the Curve banner: the result once the targets are gone or the keeper is. */
+export function steerBanner(state: SteerState): Banner | null {
+  if (state === 'won')
+    return { title: 'Cleared!', detail: 'The red square vanished, and yours held.', tone: 'win' };
+  if (state === 'lost') {
+    return {
+      title: 'Your square vanished',
+      detail: 'It met another square, and the two folded away together.',
+      tone: 'over',
+      action: { label: 'Try again', kind: 'again' },
+    };
+  }
+  return null;
 }

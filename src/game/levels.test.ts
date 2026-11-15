@@ -12,7 +12,9 @@ import {
   randomLevel,
   routeOf,
 } from './levels';
+import { EditableCurve } from '../geometry/editable';
 import { foldRound } from './predict';
+import { EditTracker, Steer } from './steer';
 import { foldTrace, foldsProblems, huntProblems } from './validate';
 
 const COUNT_WORDS: Record<string, number> = { Three: 3, Five: 5, Seven: 7, Nine: 9, Eleven: 11 };
@@ -37,7 +39,7 @@ describe('levels', () => {
 
   it('has every mode, with distinct ids', () => {
     expect(new Set(LEVELS.map((l) => l.mode))).toEqual(
-      new Set(['hunt', 'folds', 'count', 'choice', 'predict']),
+      new Set(['hunt', 'folds', 'count', 'choice', 'predict', 'steer']),
     );
     expect(new Set(LEVELS.map((l) => l.id)).size).toBe(LEVELS.length);
   });
@@ -156,6 +158,23 @@ describe('levels', () => {
   it('asks Fold Forecast questions earlier, so harder, as the levels go on', () => {
     const warnings = LEVELS.filter((l) => l.mode === 'predict').map((l) => l.warning!);
     for (let i = 1; i < warnings.length; i++) expect(warnings[i]).toBeGreaterThan(warnings[i - 1]);
+  });
+
+  it('can clear every Steer the Curve level by its stored hint, and the hint is needed', () => {
+    const levels = LEVELS.filter((l) => l.mode === 'steer');
+    expect(levels.length).toBeGreaterThan(0);
+    for (const level of levels) {
+      const curve = EditableCurve.fromSeed(level.seed);
+      const squares = findSquares(curve.polygon());
+      const steer = new Steer(
+        level.keeper! + 1,
+        level.targets!.map((t) => t + 1),
+      );
+      const et = new EditTracker(curve, squares);
+      const { psi, delta, steps } = level.hint!;
+      for (let i = 0; i < steps && steer.state === 'playing'; i++) steer.update(et.push(psi, delta));
+      expect(steer.state, level.id!).toBe('won');
+    }
   });
 
   it('plays an Avoid Folds level before the first Lifelines level, which adds a choice to it', () => {

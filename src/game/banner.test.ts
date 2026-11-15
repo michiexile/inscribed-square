@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { countBanner, foldsBanner, huntBanner, introBanner, predictBanner } from './banner';
+import { countBanner, foldsBanner, huntBanner, introBanner, predictBanner, steerBanner } from './banner';
 
 describe('foldsBanner', () => {
   it('shows nothing while searching or holding', () => {
@@ -147,5 +147,29 @@ describe('introBanner for Fold Forecast', () => {
     const b = introBanner('predict', 'centre', undefined);
     expect(b.detail).toMatch(/two of these squares/i);
     expect(b.detail).toMatch(/tap/i);
+  });
+});
+
+describe('steerBanner', () => {
+  it('shows nothing while playing', () => {
+    expect(steerBanner('playing')).toBeNull();
+  });
+
+  it('celebrates a win, and explains a loss with a retry', () => {
+    expect(steerBanner('won')).toMatchObject({ title: 'Cleared!', tone: 'win' });
+    expect(steerBanner('lost')).toMatchObject({
+      tone: 'over',
+      action: { label: 'Try again', kind: 'again' },
+    });
+    expect(steerBanner('lost')?.detail).toMatch(/met another square/);
+  });
+});
+
+describe('introBanner for Steer the Curve', () => {
+  it('names the gold and red squares and says squares vanish in pairs', () => {
+    const b = introBanner('steer', 'centre', undefined);
+    expect(b.detail).toMatch(/gold/);
+    expect(b.detail).toMatch(/red/);
+    expect(b.detail).toMatch(/pairs/);
   });
 });

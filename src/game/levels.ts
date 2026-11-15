@@ -13,8 +13,10 @@ import { huntProblems } from './validate';
  *   a choice.
  * - `predict`: Fold Forecast. A morphing curve stops just before a fold; the player taps one of the two squares about
  *   to fold away.
+ * - `steer`: Steer the Curve. The player reshapes a still curve to make a target square fold away while keeping
+ *   their own.
  */
-export type ModeId = 'hunt' | 'folds' | 'count' | 'choice' | 'predict';
+export type ModeId = 'hunt' | 'folds' | 'count' | 'choice' | 'predict' | 'steer';
 
 export const MODE_NAMES: Record<ModeId, string> = {
   hunt: 'Square Hunt',
@@ -22,6 +24,7 @@ export const MODE_NAMES: Record<ModeId, string> = {
   count: 'Odd One Out',
   choice: 'Lifelines',
   predict: 'Fold Forecast',
+  steer: 'Steer the Curve',
 };
 
 /** Whether the mode plays on a still curve, `randomCurve(seed)`. */
@@ -41,6 +44,14 @@ export interface Level {
   readonly seed: number;
   /** Morphing modes only: morph seconds per real second. Default 1. Later levels morph faster. */
   readonly speed?: number;
+  /**
+   * Steer the Curve only: the square to keep and the squares to fold away, as indices into `findSquares` of the
+   * level's curve, and a push that clears it (`delta` per step at angle `psi`, `steps` times) to prove it can be
+   * cleared. Random curves pick with `steerPick`.
+   */
+  readonly keeper?: number;
+  readonly targets?: readonly number[];
+  readonly hint?: { readonly psi: number; readonly delta: number; readonly steps: number };
   /** Fold Forecast only: the morph times its rounds stop at; random curves search for rounds instead. */
   readonly rounds?: readonly number[];
   /** Fold Forecast only: about how many morph seconds before the fold each question is asked. */
@@ -71,6 +82,15 @@ export const LEVELS: readonly Level[] = [
     rounds: [1, 14, 41.3, 50.4, 98.5],
     goal: 3,
   },
+  {
+    id: 'steer-1',
+    name: 'Squeeze',
+    mode: 'steer',
+    seed: 3,
+    keeper: 1,
+    targets: [0],
+    hint: { psi: 0, delta: -0.01, steps: 20 },
+  },
   { id: 'folds-2', name: 'Undertow', mode: 'folds', seed: 2, speed: 1.5, goal: 25 },
   { id: 'count-2', name: 'Count them all', mode: 'count', seed: 105 },
   { id: 'hunt-4', name: 'Nine squares', mode: 'hunt', seed: 51 },
@@ -84,6 +104,15 @@ export const LEVELS: readonly Level[] = [
     warning: 3,
     rounds: [14, 34.8, 63.4, 86.8, 112.8],
     goal: 3,
+  },
+  {
+    id: 'steer-2',
+    name: 'Pinch',
+    mode: 'steer',
+    seed: 7,
+    keeper: 3,
+    targets: [0],
+    hint: { psi: 0, delta: 0.01, steps: 40 },
   },
   { id: 'folds-4', name: 'Rapids', mode: 'folds', seed: 3, speed: 3, goal: 30 },
 ];
@@ -119,7 +148,7 @@ export function parseRoute(hash: string): Level | null {
   const h = hash.replace(/^#/, '');
   const level = LEVELS.find((l) => l.id === h);
   if (level) return level;
-  const random = /^(hunt|folds|count|choice|predict)\/(\d+)$/.exec(h);
+  const random = /^(hunt|folds|count|choice|predict|steer)\/(\d+)$/.exec(h);
   if (random) return randomLevel(random[1] as ModeId, Number(random[2]));
   if (/^\d+$/.test(h)) return randomLevel('hunt', Number(h));
   return null;
