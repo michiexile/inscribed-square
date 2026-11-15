@@ -1,6 +1,7 @@
 import type { EditableCurve } from '../geometry/editable';
 import { type InscribedSquare, findSquares } from '../geometry/solver';
 import { SquareTracker, squareGap } from '../geometry/tracker';
+import type { Vec } from '../geometry/vec';
 
 export type SteerState = 'playing' | 'won' | 'lost';
 
@@ -103,4 +104,20 @@ export function steerPick(squares: readonly InscribedSquare[]): { keeper: number
       if (!best || gap < best.gap) best = { gap, target: i };
     }
   return best && { keeper, targets: [best.target] };
+}
+
+/** How much of the gap between the curve and the finger a pull closes each frame. */
+const PULL = 0.12;
+/** The most a pull moves the curve at the finger in one frame, in curve units. */
+const MAX_PULL = 0.006;
+
+/**
+ * One frame of pulling the curve toward the finger at `p` (curve coordinates): it moves part of the way there along
+ * the ray from the centre. Returns the ids of squares that died, or null when the curve did not move.
+ */
+export function pullToward(edit: EditTracker, p: Vec): number[] | null {
+  const psi = Math.atan2(p.y, p.x);
+  const gap = Math.hypot(p.x, p.y) - edit.curve.radius(psi);
+  const delta = Math.max(-MAX_PULL, Math.min(MAX_PULL, gap * PULL));
+  return Math.abs(delta) < 1e-4 ? null : edit.push(psi, delta);
 }

@@ -22,6 +22,7 @@ import { FoldsMode } from './modes/foldsMode';
 import { HuntMode } from './modes/huntMode';
 import { PredictMode } from './modes/predictMode';
 import { SteerMode } from './modes/steerMode';
+import { BuildMode } from './modes/buildMode';
 import type { GameMode } from './modes/mode';
 import { Renderer } from './render';
 
@@ -90,15 +91,17 @@ function start(next: Level): void {
       ? new PredictMode(next.seed, next.warning, next.rounds, next.goal, label)
       : next.mode === 'steer'
         ? new SteerMode(next.seed, next.keeper, next.targets, label)
-        : new FoldsMode(
-            next.seed,
-            next.speed ?? 1,
-            TOLERANCE,
-            GRACE_MS,
-            label,
-            next.goal,
-            next.mode === 'choice' ? LIFELINE_HORIZON : 0,
-          );
+        : next.mode === 'build'
+          ? new BuildMode(next.seed, next.goal, TOLERANCE, label)
+          : new FoldsMode(
+              next.seed,
+              next.speed ?? 1,
+              TOLERANCE,
+              GRACE_MS,
+              label,
+              next.goal,
+              next.mode === 'choice' ? LIFELINE_HORIZON : 0,
+            );
   intro = !progress.hasSeenIntro(next.mode);
   heldSquare.reset();
   history.replaceState(null, '', routeOf(next));
@@ -145,7 +148,7 @@ function buildMenu(): void {
       'primary';
     menu!.append(section);
   }
-  for (const mode of ['hunt', 'count', 'folds', 'choice', 'predict', 'steer'] as ModeId[]) {
+  for (const mode of ['hunt', 'count', 'folds', 'choice', 'predict', 'steer', 'build'] as ModeId[]) {
     const section = document.createElement('section');
     const heading = document.createElement('h2');
     heading.textContent = MODE_NAMES[mode];

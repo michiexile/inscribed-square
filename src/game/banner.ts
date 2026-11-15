@@ -1,6 +1,7 @@
 import type { Control } from './control';
 import type { LastClaim } from './count';
 import type { PredictPhase } from './predict';
+import type { BuildCount } from './build';
 import type { SteerState } from './steer';
 import { GRACE_MS } from './feel';
 import type { Phase } from './folds';
@@ -67,6 +68,15 @@ export function introBanner(mode: ModeId, control: Control, goal: number | undef
     control === 'corners'
       ? 'Put two thumbs on the screen: each one slides a corner of a square along the curve.'
       : 'Drag one finger to move a square around; it fits itself to the curve.';
+  if (mode === 'build') {
+    return {
+      title: 'Build a curve',
+      detail:
+        `Drag with one finger: the curve stretches toward it. Give it exactly ${goal ?? 5} squares. Lift your ` +
+        'finger to count them.',
+      tone: 'info',
+    };
+  }
   if (mode === 'steer') {
     return {
       title: 'Steer the curve',
@@ -187,4 +197,11 @@ export function steerBanner(state: SteerState): Banner | null {
     };
   }
   return null;
+}
+
+/** The Build a Curve banner, once the curve has the target count. */
+export function buildBanner(state: BuildCount): Banner | null {
+  return state.met
+    ? { title: 'Built!', detail: `Your curve has exactly ${state.count} squares.`, tone: 'win' }
+    : null;
 }

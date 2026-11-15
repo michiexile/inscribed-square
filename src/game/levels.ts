@@ -15,8 +15,9 @@ import { huntProblems } from './validate';
  *   to fold away.
  * - `steer`: Steer the Curve. The player reshapes a still curve to make a target square fold away while keeping
  *   their own.
+ * - `build`: Build a Curve. The player reshapes a still curve until it has a target number of squares.
  */
-export type ModeId = 'hunt' | 'folds' | 'count' | 'choice' | 'predict' | 'steer';
+export type ModeId = 'hunt' | 'folds' | 'count' | 'choice' | 'predict' | 'steer' | 'build';
 
 export const MODE_NAMES: Record<ModeId, string> = {
   hunt: 'Square Hunt',
@@ -25,6 +26,7 @@ export const MODE_NAMES: Record<ModeId, string> = {
   choice: 'Lifelines',
   predict: 'Fold Forecast',
   steer: 'Steer the Curve',
+  build: 'Build a Curve',
 };
 
 /** Whether the mode plays on a still curve, `randomCurve(seed)`. */
@@ -45,7 +47,7 @@ export interface Level {
   /** Morphing modes only: morph seconds per real second. Default 1. Later levels morph faster. */
   readonly speed?: number;
   /**
-   * Steer the Curve only: the square to keep and the squares to fold away, as indices into `findSquares` of the
+   * Steer the Curve and Build a Curve: `hint` is a push that clears the level. Steer the Curve only: the square to keep and the squares to fold away, as indices into `findSquares` of the
    * level's curve, and a push that clears it (`delta` per step at angle `psi`, `steps` times) to prove it can be
    * cleared. Random curves pick with `steerPick`.
    */
@@ -57,7 +59,8 @@ export interface Level {
   /** Fold Forecast only: about how many morph seconds before the fold each question is asked. */
   readonly warning?: number;
   /**
-   * Morphing modes: seconds held in one round that clear the level; Fold Forecast: right answers that clear it. Random morphing curves have none and run until lost.
+   * Morphing modes: seconds held in one round that clear the level; Fold Forecast: right answers that clear it; Build a Curve: the square count to build. Random morphing curves have
+   * none and run until lost.
    */
   readonly goal?: number;
 }
@@ -93,6 +96,14 @@ export const LEVELS: readonly Level[] = [
   },
   { id: 'folds-2', name: 'Undertow', mode: 'folds', seed: 2, speed: 1.5, goal: 25 },
   { id: 'count-2', name: 'Count them all', mode: 'count', seed: 105 },
+  {
+    id: 'build-1',
+    name: 'Make five',
+    mode: 'build',
+    seed: 3,
+    goal: 5,
+    hint: { psi: (20 / 24) * 2 * Math.PI, delta: 0.02, steps: 8 },
+  },
   { id: 'hunt-4', name: 'Nine squares', mode: 'hunt', seed: 51 },
   { id: 'folds-3', name: 'Churn', mode: 'folds', seed: 5, speed: 2, goal: 30 },
   { id: 'choice-2', name: 'Crosscurrents', mode: 'choice', seed: 19, speed: 1.5, goal: 40 },
@@ -113,6 +124,22 @@ export const LEVELS: readonly Level[] = [
     keeper: 3,
     targets: [0],
     hint: { psi: 0, delta: 0.01, steps: 40 },
+  },
+  {
+    id: 'build-2',
+    name: 'Just one',
+    mode: 'build',
+    seed: 11,
+    goal: 1,
+    hint: { psi: (10 / 24) * 2 * Math.PI, delta: -0.02, steps: 10 },
+  },
+  {
+    id: 'build-3',
+    name: 'Make seven',
+    mode: 'build',
+    seed: 7,
+    goal: 7,
+    hint: { psi: (2 / 24) * 2 * Math.PI, delta: -0.02, steps: 14 },
   },
   { id: 'folds-4', name: 'Rapids', mode: 'folds', seed: 3, speed: 3, goal: 30 },
 ];
@@ -148,7 +175,7 @@ export function parseRoute(hash: string): Level | null {
   const h = hash.replace(/^#/, '');
   const level = LEVELS.find((l) => l.id === h);
   if (level) return level;
-  const random = /^(hunt|folds|count|choice|predict|steer)\/(\d+)$/.exec(h);
+  const random = /^(hunt|folds|count|choice|predict|steer|build)\/(\d+)$/.exec(h);
   if (random) return randomLevel(random[1] as ModeId, Number(random[2]));
   if (/^\d+$/.test(h)) return randomLevel('hunt', Number(h));
   return null;

@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { countBanner, foldsBanner, huntBanner, introBanner, predictBanner, steerBanner } from './banner';
+import {
+  buildBanner,
+  countBanner,
+  foldsBanner,
+  huntBanner,
+  introBanner,
+  predictBanner,
+  steerBanner,
+} from './banner';
 
 describe('foldsBanner', () => {
   it('shows nothing while searching or holding', () => {
@@ -171,5 +179,23 @@ describe('introBanner for Steer the Curve', () => {
     expect(b.detail).toMatch(/gold/);
     expect(b.detail).toMatch(/red/);
     expect(b.detail).toMatch(/pairs/);
+  });
+});
+
+describe('buildBanner', () => {
+  it('celebrates only a met target', () => {
+    expect(buildBanner({ count: 5, settled: true, met: true })).toMatchObject({
+      title: 'Built!',
+      tone: 'win',
+    });
+    expect(buildBanner({ count: 5, settled: true, met: false })).toBeNull();
+  });
+});
+
+describe('introBanner for Build a Curve', () => {
+  it('names the target count and says lifting the finger counts', () => {
+    const b = introBanner('build', 'centre', 5);
+    expect(b.detail).toMatch(/exactly 5 squares/);
+    expect(b.detail).toMatch(/lift/i);
   });
 });

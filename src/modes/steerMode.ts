@@ -1,16 +1,11 @@
 import { type Banner, steerBanner } from '../game/banner';
-import { EditTracker, Steer, steerPick } from '../game/steer';
+import { EditTracker, Steer, pullToward, steerPick } from '../game/steer';
 import { EditableCurve } from '../geometry/editable';
 import type { Polygon } from '../geometry/polygon';
 import { findSquares } from '../geometry/solver';
 import type { Vec } from '../geometry/vec';
 import type { Renderer } from '../render';
 import type { GameMode } from './mode';
-
-/** How much of the gap between the curve and the finger is closed each frame. */
-const PULL = 0.12;
-/** The most the curve moves at the finger in one frame, in curve units. */
-const MAX_PULL = 0.006;
 
 /**
  * Steer the Curve: the player drags the curve toward their finger to reshape it. The tracker follows every square
@@ -57,11 +52,9 @@ export class SteerMode implements GameMode {
   advance(): void {
     const p = this.finger;
     if (!p || this.steer.state !== 'playing') return;
-    const psi = Math.atan2(p.y, p.x);
-    const gap = Math.hypot(p.x, p.y) - this.edit.curve.radius(psi);
-    const delta = Math.max(-MAX_PULL, Math.min(MAX_PULL, gap * PULL));
-    if (Math.abs(delta) < 1e-4) return;
-    this.steer.update(this.edit.push(psi, delta));
+    const died = pullToward(this.edit, p);
+    if (!died) return;
+    this.steer.update(died);
     this.curve = this.edit.curve.polygon();
   }
 

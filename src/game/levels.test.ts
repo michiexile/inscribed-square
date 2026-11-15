@@ -13,6 +13,7 @@ import {
   routeOf,
 } from './levels';
 import { EditableCurve } from '../geometry/editable';
+import { buildCount } from './build';
 import { foldRound } from './predict';
 import { EditTracker, Steer } from './steer';
 import { foldTrace, foldsProblems, huntProblems } from './validate';
@@ -39,7 +40,7 @@ describe('levels', () => {
 
   it('has every mode, with distinct ids', () => {
     expect(new Set(LEVELS.map((l) => l.mode))).toEqual(
-      new Set(['hunt', 'folds', 'count', 'choice', 'predict', 'steer']),
+      new Set(['hunt', 'folds', 'count', 'choice', 'predict', 'steer', 'build']),
     );
     expect(new Set(LEVELS.map((l) => l.id)).size).toBe(LEVELS.length);
   });
@@ -174,6 +175,19 @@ describe('levels', () => {
       const { psi, delta, steps } = level.hint!;
       for (let i = 0; i < steps && steer.state === 'playing'; i++) steer.update(et.push(psi, delta));
       expect(steer.state, level.id!).toBe('won');
+    }
+  });
+
+  it('can clear every Build a Curve level by its stored hint, from a curve that starts off target', () => {
+    const levels = LEVELS.filter((l) => l.mode === 'build');
+    expect(levels.length).toBeGreaterThan(0);
+    for (const level of levels) {
+      let curve = EditableCurve.fromSeed(level.seed);
+      expect(findSquares(curve.polygon()).length, level.id!).not.toBe(level.goal);
+      const { psi, delta, steps } = level.hint!;
+      for (let i = 0; i < steps; i++) curve = curve.pushed(psi, delta);
+      const polygon = curve.polygon();
+      expect(buildCount(polygon, findSquares(polygon), level.goal!, TOLERANCE).met, level.id!).toBe(true);
     }
   });
 
