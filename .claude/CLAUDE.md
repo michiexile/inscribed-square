@@ -54,8 +54,9 @@ https://claude.ai/artifact/CqdHHDvThUbNKJiYkcmq2t, partly superseded).
   right claim, `src/game/count.ts`; its messages never reveal the count before then; and Lifelines, which is `FoldsMode`
   with a horizon: `LeadTracker` (`src/geometry/lookahead.ts`) runs the tracker that far ahead of the display so each
   square's death time is known, and full solves for it are made at its `aheadTime`; and Fold Forecast, `PredictMode`,
-  played by tapping (`GameMode.tapOnly`), whose rounds come from `foldRound` in `src/game/predict.ts` and are stored as
-  morph times in campaign levels; and Steer the Curve, `SteerMode`, which takes the finger directly (`GameMode.pointer`):
+  played by tapping (`GameMode.tapOnly`) on one card per square (`src/game/cards.ts`), whose rounds come from `foldRound`
+  in `src/game/predict.ts` and are stored as morph times in campaign levels; before each question it loops
+  `FORECAST_PREVIEW` seconds of motion (`lookBack`), and `levels.test.ts` checks the folding pair closes in during it; and Steer the Curve, `SteerMode`, which takes the finger directly (`GameMode.pointer`):
   `EditableCurve` (`src/geometry/editable.ts`) is pushed toward it, `EditTracker` splits each push into steps of at most
   `PUSH_STEP` for the tracker, and every campaign level stores a push `hint` that `levels.test.ts` proves clears it; and Build a Curve, `BuildMode`,
   the same pull with a target count from `buildCount` (`src/game/build.ts`): a worker (`countWorker.ts`) counts while
@@ -63,11 +64,16 @@ https://claude.ai/artifact/CqdHHDvThUbNKJiYkcmq2t, partly superseded).
   visit with no progress starts at `LEVELS[0]`); Avoid Folds levels clear at their `goal` seconds held in one round.
   Progress (cleared levels, seen intros) lives in `src/game/progress.ts` and must survive blocked or junk storage. Mode rules live in DOM-free classes in `src/game/` (`hunt.ts`,
   `folds.ts`); feel constants are guesses tracked in #5 and #12 (those the validator needs live in `src/game/feel.ts`).
-- `src/geometry/square.ts` (control 1) and `centre.ts` (control 2) build the held square; drag the centre is the
+- `src/geometry/square.ts` (control 1) and `centre.ts` (control 2) build the held square, and so do the torus pad and
+  dials (`src/game/torus.ts`: two nodes on the curve as a point on the (s, t) torus map, drawn for every holding
+  control; project lead 2026-11-17: build every control idea, prune later); drag the centre works like a trackpad (`HeldSquare`
+  moves the square by the finger's motion, so the finger can stay below the curve, which `curveCentreY` lifts on tall
+  screens) and is the
   default (`DEFAULT_CONTROL`, project lead, 2026-11-15) and the player's choice is saved in `Progress`; `src/game/hunt.ts` counts a
   held square only after Newton refinement confirms a real inscribed square near it, because a within-tolerance held
   square can be a near-miss (`.claude/WORKLOG-playtest-1.md`), and only after a dwell on that square, so scrubbing
-  does not collect squares (`.claude/WORKLOG-dwell.md`).
+  does not collect squares (`.claude/WORKLOG-dwell.md`). A square held again after an earlier find is `Hold.known`, drawn teal, not as a new
+  find.
 - `src/main.ts` routes to the game (`src/app.ts`: canvas, level menu and event wiring; `src/render.ts`: drawing) or
   the `?bench` page;
   keep logic out of `app.ts` so it stays testable. Canvas drawing, pointer positions and pixel constants are in layout

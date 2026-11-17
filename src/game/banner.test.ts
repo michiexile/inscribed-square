@@ -47,6 +47,9 @@ describe('introBanner', () => {
   it('explains the control actually in use: two thumbs for corners, one finger for the centre', () => {
     expect(introBanner('hunt', 'corners', undefined).detail).toMatch(/two thumbs/i);
     expect(introBanner('hunt', 'centre', undefined).detail).toMatch(/one finger/i);
+    // The finger works like a trackpad, so it can stay off the curve.
+    expect(introBanner('hunt', 'centre', undefined).detail).toMatch(/anywhere/i);
+    expect(introBanner('hunt', 'centre', undefined).detail).toMatch(/teal/i);
   });
 
   it("tells Avoid Folds players the level's goal and the grace time", () => {
@@ -98,6 +101,13 @@ describe('countBanner', () => {
     });
     expect(countBanner(null, 0, true, 5, 2)?.detail).toBe('After 2 wrong guesses');
     expect(countBanner(null, 0, true, 5, 1)?.detail).toBe('After 1 wrong guess');
+  });
+});
+
+describe('introBanner for the torus controls', () => {
+  it('explains the map for the pad and the dials for the dials', () => {
+    expect(introBanner('hunt', 'pad', undefined).detail).toMatch(/map/i);
+    expect(introBanner('hunt', 'dials', undefined).detail).toMatch(/dials/i);
   });
 });
 
@@ -154,7 +164,8 @@ describe('introBanner for Fold Forecast', () => {
   it('asks for one of the pair, by tapping', () => {
     const b = introBanner('predict', 'centre', undefined);
     expect(b.detail).toMatch(/two of these squares/i);
-    expect(b.detail).toMatch(/tap/i);
+    expect(b.detail).toMatch(/hold the card/i);
+    expect(b.detail).toMatch(/closing in/i);
   });
 });
 

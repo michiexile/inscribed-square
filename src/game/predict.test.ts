@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MorphingCurve } from '../geometry/morph';
-import { PredictGame, type Round, foldRound, roundSearch } from './predict';
+import { CardPress, PredictGame, type Round, foldRound, lookBack, roundSearch } from './predict';
 
 // Morph seed 1 (tracker.test.ts): 7 squares at 15 s, a pair folds away between 16 s and 16.25 s, and no square dies
 // between 9 s and 14 s.
@@ -24,6 +24,37 @@ describe('foldRound', () => {
   it('finds no round where the fold comes much sooner than the warning time', () => {
     // A question asked a moment before the fold would show the pair already on top of each other.
     expect(foldRound(morph, 15.95, 2)).toBeNull();
+  });
+});
+
+describe('lookBack', () => {
+  const r = foldRound(morph, 15, 1)!;
+  const frames = lookBack(morph, r, 1.5);
+
+  it('runs forward in time and ends at the round, with its squares under their own ids', () => {
+    expect(frames[0].time).toBeCloseTo(13.5, 5);
+    expect(frames.at(-1)!.time).toBe(15);
+    for (let i = 1; i < frames.length; i++) expect(frames[i].time).toBeGreaterThan(frames[i - 1].time);
+    const last = frames.at(-1)!;
+    for (const q of r.squares) expect(last.squares.get(q.id)).toEqual(q.square.corners);
+  });
+
+  it('follows each square back continuously', () => {
+    for (let i = 1; i < frames.length; i++)
+      for (const [id, corners] of frames[i].squares) {
+        const before = frames[i - 1].squares.get(id);
+        if (before)
+          expect(Math.hypot(before[0].x - corners[0].x, before[0].y - corners[0].y)).toBeLessThan(0.1);
+      }
+  });
+
+  it('shows the folding pair growing more alike as the fold nears', () => {
+    // The cue the player reads: the two squares that fold away close in on each other.
+    const gap = (f: (typeof frames)[number]) => {
+      const [a, b] = r.dying.map((id) => f.squares.get(id)!);
+      return Math.max(...a.map((p) => Math.min(...b.map((q) => Math.hypot(p.x - q.x, p.y - q.y)))));
+    };
+    expect(gap(frames.at(-1)!)).toBeLessThan(gap(frames[0]));
   });
 });
 
@@ -95,5 +126,33 @@ describe('roundSearch', () => {
     expect(rounds.map((r) => r.time)).toEqual([b(), b(), b()].map((r) => r.time));
     for (let i = 1; i < rounds.length; i++) expect(rounds[i].time).toBeGreaterThan(rounds[i - 1].time);
     for (const r of rounds) expect(foldRound(morph, r.time, 1.5)).not.toBeNull();
+  });
+});
+
+describe('CardPress', () => {
+  it('commits a card held for the whole press time, once', () => {
+    const press = new CardPress(600);
+    press.down(3, 1000);
+    expect(press.update(1300)).toBeNull();
+    expect(press.held).toEqual({ id: 3, progress: 0.5 });
+    expect(press.update(1600)).toBe(3);
+    expect(press.update(1700)).toBeNull();
+    expect(press.held).toBeNull();
+  });
+
+  it('commits nothing when the finger lifts early, so looking at a card is free', () => {
+    const press = new CardPress(600);
+    press.down(3, 1000);
+    press.up();
+    expect(press.update(2000)).toBeNull();
+    expect(press.held).toBeNull();
+  });
+
+  it('starts over when the finger lands on another card', () => {
+    const press = new CardPress(600);
+    press.down(3, 1000);
+    press.down(4, 1500);
+    expect(press.update(1700)).toBeNull();
+    expect(press.update(2100)).toBe(4);
   });
 });

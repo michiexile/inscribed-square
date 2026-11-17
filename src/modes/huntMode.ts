@@ -1,11 +1,16 @@
 import { type Banner, CLAIM_MESSAGE_MS, countBanner, huntBanner } from '../game/banner';
 import type { Held } from '../game/control';
 import { Claims } from '../game/count';
+import { type TorusPoint, torusPoints } from '../game/torus';
 import { type Hold, Hunt } from '../game/hunt';
 import type { Polygon } from '../geometry/polygon';
 import { findSquares } from '../geometry/solver';
 import type { Renderer } from '../render';
 import type { GameMode } from './mode';
+
+/** Squares the player has already found: a faint fill, and the full colour when held again. */
+const FOUND = 'hsl(172, 75%, 48%)';
+const FOUND_FILL = 'hsla(172, 75%, 48%, 0.14)';
 
 /**
  * Square Hunt: find every inscribed square of a still curve, holding each for the dwell time. With `hideCount` it is
@@ -20,7 +25,7 @@ export class HuntMode implements GameMode {
   private readonly solveMs: number;
   private lastFound = 0;
   private error: number | null = null;
-  private hold: Hold = { square: null, progress: 0 };
+  private hold: Hold = { square: null, progress: 0, known: false };
 
   constructor(
     readonly curve: Polygon,
@@ -37,17 +42,24 @@ export class HuntMode implements GameMode {
 
   advance(): void {}
 
+  marks(): readonly TorusPoint[] {
+    return this.hunt.found.flatMap(torusPoints);
+  }
+
   frame(r: Renderer, held: Held | null, now: number, reveal: boolean): boolean {
     this.now = now;
     r.curve(this.curve.vertices);
-    for (const q of this.hunt.found) r.fill(q.corners, 'rgba(102, 220, 120, 0.12)');
+    for (const q of this.hunt.found) r.fill(q.corners, FOUND_FILL);
     if (reveal)
       for (const q of this.hunt.squares) r.outline(q.corners, 'rgba(200, 160, 255, 0.7)', 1.5, [6, 6]);
 
     this.error = held?.error ?? null;
     this.hold = this.hunt.hold(held?.corners ?? null, held?.error ?? 0, now);
     const snapped = this.hold.square;
-    if (snapped) {
+    if (snapped && this.hold.known) {
+      // Back on a square already found: drawn in the found colour, so it is plainly not a new one.
+      r.snapped(snapped.corners, FOUND, 0.3);
+    } else if (snapped) {
       // The fill grows with the dwell; a ring round the centre fills up until the square counts.
       r.snapped(snapped.corners, r.closeness(0), 0.08 + 0.27 * this.hold.progress);
       if (this.hold.progress < 1) r.ring(r.toScreen(snapped.centre), 18, this.hold.progress, r.closeness(0));
@@ -67,12 +79,13 @@ export class HuntMode implements GameMode {
   }
 
   hud(): string {
-    if (this.hideCount) return `Found ${this.hunt.found.length} · ${this.label}`;
+    const again = this.hold.known ? ' · already found' : '';
+    if (this.hideCount) return `Found ${this.hunt.found.length}${again} · ${this.label}`;
     const extra = this.hunt.extra > 0 ? ` (${this.hunt.extra} the solver missed)` : '';
     const err =
       this.error === null ? '' : ` · error ${this.error.toFixed(3)}${this.hold.progress >= 1 ? ' ✓' : ''}`;
     return (
-      `Found ${this.hunt.found.length} of ${this.hunt.squares.length}${extra}${err}` +
+      `Found ${this.hunt.found.length} of ${this.hunt.squares.length}${extra}${err}${again}` +
       ` · ${this.label} · solved in ${this.solveMs.toFixed(0)} ms`
     );
   }

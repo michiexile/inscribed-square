@@ -1,3 +1,4 @@
+import type { TorusPoint } from '../game/torus';
 import type { Banner } from '../game/banner';
 import type { Held } from '../game/control';
 import type { Polygon } from '../geometry/polygon';
@@ -30,6 +31,8 @@ export interface GameMode {
    * coordinates, or null when no finger is down. Called every frame before `advance`.
    */
   pointer?(p: Vec | null): void;
+  /** Points to mark on the torus map, such as the squares found so far. */
+  marks?(): readonly TorusPoint[];
   /** A tap at a point in layout pixels, for modes played by tapping. */
   tap?(p: Vec, now: number): void;
   /** Odd One Out only: the player says they have found every square, at time `now` (milliseconds). */

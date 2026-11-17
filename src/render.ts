@@ -1,6 +1,7 @@
 import type { ClosedCurve } from './geometry/curve';
 import type { Corners } from './geometry/square';
 import type { Vec } from './geometry/vec';
+import type { Dial, TorusLayout, TorusPoint } from './game/torus';
 
 export const THUMB_COLOURS = ['#4fc3f7', '#ffb74d'];
 
@@ -11,7 +12,26 @@ export class Renderer {
     readonly toScreen: (p: Vec) => Vec,
     /** Corner distance below which a corner shows as on the curve (green). */
     readonly tolerance: number,
+    /** The canvas size in layout pixels. */
+    readonly size: { readonly width: number; readonly height: number } = { width: 0, height: 0 },
   ) {}
+
+  /** The same canvas with another mapping from curve coordinates, such as into a card. */
+  within(toScreen: (p: Vec) => Vec): Renderer {
+    return new Renderer(this.ctx, toScreen, this.tolerance, this.size);
+  }
+
+  /** A card's background and border, in layout pixels. */
+  panel(x: number, y: number, size: number, border: string, width: number): void {
+    const ctx = this.ctx;
+    ctx.beginPath();
+    ctx.roundRect(x, y, size, size, 10);
+    ctx.fillStyle = '#161d23';
+    ctx.fill();
+    ctx.strokeStyle = border;
+    ctx.lineWidth = width;
+    ctx.stroke();
+  }
 
   /** Green within tolerance, through yellow, to red at eight times the tolerance. */
   closeness(d: number): string {
@@ -38,10 +58,10 @@ export class Renderer {
     this.ctx.fill();
   }
 
-  curve(vertices: readonly Vec[]): void {
+  curve(vertices: readonly Vec[], colour = '#e0e6eb', width = 2): void {
     this.path(vertices);
-    this.ctx.strokeStyle = '#e0e6eb';
-    this.ctx.lineWidth = 2;
+    this.ctx.strokeStyle = colour;
+    this.ctx.lineWidth = width;
     this.ctx.stroke();
   }
 
@@ -164,5 +184,71 @@ export class Renderer {
     ctx.stroke();
     ctx.setLineDash([]);
     this.dot(c, 7, colour);
+  }
+
+  /**
+   * The (s, t) torus map: s across in the first node's colour, t up in the second's. The dashed diagonal is where the
+   * two nodes coincide; `marks` are points of found squares, and `point` is the player's, with its mirror image.
+   */
+  torusMap(
+    map: TorusLayout['map'],
+    point: TorusPoint | null,
+    marks: readonly TorusPoint[],
+    mark: string,
+  ): void {
+    const { x, y, size } = map;
+    if (size <= 0) return;
+    const ctx = this.ctx;
+    const at = (p: TorusPoint): Vec => ({ x: x + p.s * size, y: y + (1 - p.t) * size });
+    ctx.fillStyle = '#161d23';
+    ctx.fillRect(x, y, size, size);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = THUMB_COLOURS[0];
+    ctx.beginPath();
+    ctx.moveTo(x, y + size);
+    ctx.lineTo(x + size, y + size);
+    ctx.stroke();
+    ctx.strokeStyle = THUMB_COLOURS[1];
+    ctx.beginPath();
+    ctx.moveTo(x, y + size);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    ctx.strokeStyle = '#2a333b';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, size, size);
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(x, y + size);
+    ctx.lineTo(x + size, y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    const r = Math.max(2.5, size / 60);
+    for (const m of marks) this.dot(at(m), r, mark);
+    if (point) {
+      ctx.globalAlpha = 0.35;
+      this.dot(at({ s: point.t, t: point.s }), r + 1, '#ffffff');
+      ctx.globalAlpha = 1;
+      this.dot(at(point), r + 2, '#ffffff');
+    }
+  }
+
+  /** A dial for one node: a ring, and a hand pointing at the node's parameter, anticlockwise from the right. */
+  dial(d: Dial, param: number, colour: string, active: boolean): void {
+    const ctx = this.ctx;
+    ctx.fillStyle = '#161d23';
+    ctx.beginPath();
+    ctx.arc(d.x, d.y, d.radius, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.strokeStyle = colour;
+    ctx.lineWidth = active ? 4 : 2;
+    ctx.stroke();
+    const a = 2 * Math.PI * param;
+    const tip = { x: d.x + 0.8 * d.radius * Math.cos(a), y: d.y - 0.8 * d.radius * Math.sin(a) };
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(d.x, d.y);
+    ctx.lineTo(tip.x, tip.y);
+    ctx.stroke();
+    this.dot(tip, 6, colour);
   }
 }

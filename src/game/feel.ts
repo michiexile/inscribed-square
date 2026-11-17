@@ -11,3 +11,6 @@ export const GRACE_MS = 3000;
 
 /** How far ahead Lifelines shows each square's time left, in real seconds. */
 export const LIFELINE_HORIZON = 6;
+
+/** How much motion Fold Forecast loops before each question, in morph seconds. */
+export const FORECAST_PREVIEW = 2;

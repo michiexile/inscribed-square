@@ -8,6 +8,8 @@ export interface Hold {
   readonly square: InscribedSquare | null;
   /** 0 to 1; reaching 1 counts the square as found. Already-found squares are at 1 straight away. */
   readonly progress: number;
+  /** True when the player came back to a square found on an earlier hold, so it is not a new one to find. */
+  readonly known: boolean;
 }
 
 /**
@@ -30,7 +32,7 @@ export class Hunt {
     readonly dwell: number,
   ) {}
 
-  private holding: { square: InscribedSquare; since: number } | null = null;
+  private holding: { square: InscribedSquare; since: number; known: boolean } | null = null;
 
   /**
    * Updates the hold with this frame's held square at time `now` (milliseconds). A frame off the square, or on a
@@ -40,16 +42,18 @@ export class Hunt {
     const square = corners ? this.match(corners, error) : null;
     if (!square) {
       this.holding = null;
-      return { square: null, progress: 0 };
+      return { square: null, progress: 0, known: false };
     }
-    if (this.found.includes(square)) return { square, progress: 1 };
-    if (this.holding?.square !== square) this.holding = { square, since: now };
+    if (this.holding?.square !== square)
+      this.holding = { square, since: now, known: this.found.includes(square) };
+    const known = this.holding.known;
+    if (this.found.includes(square)) return { square, progress: 1, known };
     const progress = Math.min(1, (now - this.holding.since) / this.dwell);
     if (progress >= 1) {
       if (!this.squares.includes(square)) this.extra++;
       this.found.push(square);
     }
-    return { square, progress };
+    return { square, progress, known };
   }
 
   /**

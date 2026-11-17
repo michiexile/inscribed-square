@@ -105,11 +105,25 @@ describe('Hunt', () => {
 
   it('counts a square held steadily for the dwell, reporting progress on the way', () => {
     const hunt = new Hunt(tri, squares, TOL, DWELL);
-    expect(hunt.hold(squares[0].corners, 0, 0)).toEqual({ square: squares[0], progress: 0 });
+    expect(hunt.hold(squares[0].corners, 0, 0)).toEqual({ square: squares[0], progress: 0, known: false });
     expect(hunt.hold(squares[0].corners, 0, DWELL / 2).progress).toBeCloseTo(0.5);
     expect(hunt.found).toEqual([]);
     expect(hunt.hold(squares[0].corners, 0, DWELL).progress).toBe(1);
     expect(hunt.found).toEqual([squares[0]]);
+  });
+
+  it('marks a square as known only when the hold began on it after it was found', () => {
+    const hunt = new Hunt(tri, squares, TOL, DWELL);
+    expect(hunt.hold(squares[0].corners, 0, 0).known).toBe(false);
+    // Still held just after counting: this is the find itself, so it is not yet known.
+    expect(hunt.hold(squares[0].corners, 0, DWELL).known).toBe(false);
+    expect(hunt.hold(squares[0].corners, 0, DWELL * 2).known).toBe(false);
+    hunt.hold(null, 0, DWELL * 3);
+    // Coming back to it later, it is one the player already has.
+    const again = hunt.hold(squares[0].corners, 0, DWELL * 4);
+    expect(again).toEqual({ square: squares[0], progress: 1, known: true });
+    // A square not found yet is never known.
+    expect(hunt.hold(squares[1].corners, 0, DWELL * 5).known).toBe(false);
   });
 
   it('restarts the dwell when the hold moves to another square', () => {
