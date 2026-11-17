@@ -26,12 +26,23 @@ export interface Held {
   readonly error: number;
 }
 
-/** Turns thumb positions into a held square, remembering the last drag-centre fit so it follows smoothly. */
+/**
+ * Turns thumb positions into a held square. With drag the centre the finger works like a trackpad: the square moves
+ * by as much as the finger does, wherever on the screen the finger is, so the finger need not cover the curve. The
+ * square starts at the middle of the curve and stays where it was left when the finger lifts.
+ */
 export class HeldSquare {
   private lastFit: CentreFit | undefined;
+  /** The held centre, in curve coordinates; kept across lifts, and forgotten with `reset`. */
+  private centre: Vec | null = null;
+  /** Where the finger was on the previous frame while it is down. */
+  private finger: Vec | null = null;
 
+  /** Forgets the square, for a new curve. */
   reset(): void {
     this.lastFit = undefined;
+    this.centre = null;
+    this.finger = null;
   }
 
   /** The held square from the two thumb slots, in curve coordinates; null when the control lacks its thumbs. */
@@ -44,10 +55,32 @@ export class HeldSquare {
     }
     const t = thumbs[0] ?? thumbs[1];
     if (!t) {
-      this.lastFit = undefined;
+      this.finger = null;
       return null;
     }
-    this.lastFit = fitSquareAtCentre(curve, t, this.lastFit);
+    const box = bounds(curve);
+    const from = this.centre ?? { x: (box.min.x + box.max.x) / 2, y: (box.min.y + box.max.y) / 2 };
+    const moved = this.finger ? { x: from.x + t.x - this.finger.x, y: from.y + t.y - this.finger.y } : from;
+    this.finger = t;
+    this.centre = {
+      x: Math.min(box.max.x, Math.max(box.min.x, moved.x)),
+      y: Math.min(box.max.y, Math.max(box.min.y, moved.y)),
+    };
+    this.lastFit = fitSquareAtCentre(curve, this.centre, this.lastFit);
     return { corners: this.lastFit.corners, free: [0, 1, 2, 3], error: this.lastFit.error };
   }
+}
+
+/** The curve's bounding box, from 64 points along it. */
+function bounds(curve: ClosedCurve): { min: Vec; max: Vec } {
+  const min = { x: Infinity, y: Infinity };
+  const max = { x: -Infinity, y: -Infinity };
+  for (let i = 0; i < 64; i++) {
+    const p = curve.point(i / 64);
+    min.x = Math.min(min.x, p.x);
+    min.y = Math.min(min.y, p.y);
+    max.x = Math.max(max.x, p.x);
+    max.y = Math.max(max.y, p.y);
+  }
+  return { min, max };
 }

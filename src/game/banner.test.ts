@@ -47,6 +47,9 @@ describe('introBanner', () => {
   it('explains the control actually in use: two thumbs for corners, one finger for the centre', () => {
     expect(introBanner('hunt', 'corners', undefined).detail).toMatch(/two thumbs/i);
     expect(introBanner('hunt', 'centre', undefined).detail).toMatch(/one finger/i);
+    // The finger works like a trackpad, so it can stay off the curve.
+    expect(introBanner('hunt', 'centre', undefined).detail).toMatch(/anywhere/i);
+    expect(introBanner('hunt', 'centre', undefined).detail).toMatch(/teal/i);
   });
 
   it("tells Avoid Folds players the level's goal and the grace time", () => {

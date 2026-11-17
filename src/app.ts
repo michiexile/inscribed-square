@@ -17,7 +17,7 @@ import {
 import { type KeyValueStore, Progress } from './game/progress';
 import type { Vec } from './geometry/vec';
 import { ThumbTracker } from './input/pointers';
-import { uiScale } from './input/scale';
+import { CURVE_SPAN, curveCentreY, uiScale } from './input/scale';
 import { FoldsMode } from './modes/foldsMode';
 import { HuntMode } from './modes/huntMode';
 import { PredictMode } from './modes/predictMode';
@@ -65,6 +65,11 @@ let game: GameMode | null = null;
  * pixels, and the buttons are zoomed by it, so a browser in desktop mode shows the game at phone size.
  */
 let scale = 1;
+/**
+ * Where the top bar ends, in layout pixels; the bar is drawn over the canvas, which starts at the top of the page.
+ * Measured on resize only, so the curve does not jump when the HUD text wraps.
+ */
+let barBottom = 0;
 const thumbs = new ThumbTracker();
 const heldSquare = new HeldSquare();
 /** Reading `localStorage` itself throws where site data is blocked. */
@@ -167,10 +172,11 @@ function buildMenu(): void {
 function view(): { toScreen: (p: Vec) => Vec; toCurve: (p: Vec) => Vec } {
   const w = canvas!.clientWidth / scale;
   const h = canvas!.clientHeight / scale;
-  const k = Math.min(w, h) / 3.4;
+  const k = Math.min(w, h) / CURVE_SPAN;
+  const cy = curveCentreY(w, h, barBottom);
   return {
-    toScreen: (p) => ({ x: w / 2 + p.x * k, y: h / 2 - p.y * k }),
-    toCurve: (p) => ({ x: (p.x - w / 2) / k, y: (h / 2 - p.y) / k }),
+    toScreen: (p) => ({ x: w / 2 + p.x * k, y: cy - p.y * k }),
+    toCurve: (p) => ({ x: (p.x - w / 2) / k, y: (cy - p.y) / k }),
   };
 }
 
@@ -178,6 +184,7 @@ function resize(): void {
   scale = uiScale(window.innerWidth, window.screen.width, window.matchMedia('(pointer: coarse)').matches);
   for (const el of [document.querySelector<HTMLElement>('#bar'), menu])
     el?.style.setProperty('zoom', String(scale));
+  barBottom = (hud!.getBoundingClientRect().bottom + 8) / scale;
   const dpr = window.devicePixelRatio || 1;
   canvas!.width = Math.round(canvas!.clientWidth * dpr);
   canvas!.height = Math.round(canvas!.clientHeight * dpr);
@@ -223,7 +230,18 @@ function draw(now: number): void {
       if (!t) return;
       const g = grab[i]!;
       if (control === 'corners' && !direct) r.thumb(t, i, toScreen(curve.nearest(toCurve(g)).point));
-      else if (t === (ts[0] ?? ts[1])) r.thumb(t, 0, g);
+      else if (t === (ts[0] ?? ts[1]))
+        // Drag the centre moves the square like a trackpad: tie the finger to the square it moves.
+        r.thumb(
+          t,
+          0,
+          held && !direct
+            ? toScreen({
+                x: (held.corners[0].x + held.corners[2].x) / 2,
+                y: (held.corners[0].y + held.corners[2].y) / 2,
+              })
+            : g,
+        );
     });
   hud!.textContent = `${MODE_NAMES[level!.mode]} · ${game.hud()}`;
   claimButton!.hidden = !game.claim || game.cleared();

@@ -67,7 +67,7 @@ export function introBanner(mode: ModeId, control: Control, goal: number | undef
   const hold =
     control === 'corners'
       ? 'Put two thumbs on the screen: each one slides a corner of a square along the curve.'
-      : 'Drag one finger to move a square around; it fits itself to the curve.';
+      : 'Drag one finger anywhere on the screen to move a square, like on a trackpad; it fits itself to the curve.';
   if (mode === 'build') {
     return {
       title: 'Build a curve',
@@ -107,7 +107,9 @@ export function introBanner(mode: ModeId, control: Control, goal: number | undef
   if (mode === 'hunt') {
     return {
       title: 'Find the squares',
-      detail: `${hold} When all four corners touch the curve, hold still until it fills in.`,
+      detail:
+        `${hold} When all four corners touch the curve, hold still until it fills in. Squares you have found ` +
+        'turn teal.',
       tone: 'info',
     };
   }
