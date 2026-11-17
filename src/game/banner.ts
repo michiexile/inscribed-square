@@ -1,5 +1,8 @@
 import type { Control } from './control';
 import type { LastClaim } from './count';
+import type { PredictPhase } from './predict';
+import type { BuildCount } from './build';
+import type { SteerState } from './steer';
 import { GRACE_MS } from './feel';
 import type { Phase } from './folds';
 import type { ModeId } from './levels';
@@ -65,6 +68,33 @@ export function introBanner(mode: ModeId, control: Control, goal: number | undef
     control === 'corners'
       ? 'Put two thumbs on the screen: each one slides a corner of a square along the curve.'
       : 'Drag one finger to move a square around; it fits itself to the curve.';
+  if (mode === 'build') {
+    return {
+      title: 'Build a curve',
+      detail:
+        `Drag with one finger: the curve stretches toward it. Give it exactly ${goal ?? 5} squares. Lift your ` +
+        'finger to count them.',
+      tone: 'info',
+    };
+  }
+  if (mode === 'steer') {
+    return {
+      title: 'Steer the curve',
+      detail:
+        'Drag with one finger: the curve stretches toward it. Make the red square vanish, but keep the gold one. ' +
+        'Squares vanish in pairs, when two of them meet.',
+      tone: 'info',
+    };
+  }
+  if (mode === 'predict') {
+    return {
+      title: 'Which two fold?',
+      detail:
+        'Two of these squares are about to meet and vanish together. Tap the letter of one of them, then watch the ' +
+        'curve move on and see if you were right.',
+      tone: 'info',
+    };
+  }
   if (mode === 'count') {
     return {
       title: 'How many squares?',
@@ -83,6 +113,16 @@ export function introBanner(mode: ModeId, control: Control, goal: number | undef
   }
   const target =
     goal === undefined ? 'Hold on as long as you can.' : `Hold on for ${goal} s to clear the level.`;
+  if (mode === 'choice') {
+    return {
+      title: 'Choose your lifeline',
+      detail:
+        `The curve moves, and its squares drift. ${hold} Each square shows how long it has left. When yours ` +
+        `vanishes, the others appear: pick one that will last, and get onto it within ${GRACE_MS / 1000} seconds. ` +
+        target,
+      tone: 'info',
+    };
+  }
   return {
     title: 'Keep your square',
     detail:
@@ -118,4 +158,50 @@ export function countBanner(
         ? `${last.found} is even. Look again.`
         : 'There are more to find.';
   return { title: 'Not yet', detail, tone: 'warn' };
+}
+
+/** The Fold Forecast banner: whether the last answer was right while its fold plays out, then the result. */
+export function predictBanner(state: {
+  readonly phase: PredictPhase;
+  readonly last: { readonly right: boolean } | null;
+  readonly score: number;
+  readonly length: number;
+  readonly goal: number;
+}): Banner | null {
+  if (state.phase === 'answered' && state.last) {
+    return state.last.right
+      ? { title: 'Right!', detail: 'Those two met and vanished together.', tone: 'win' }
+      : { title: 'Not that one', detail: 'Watch which two meet.', tone: 'warn' };
+  }
+  if (state.phase !== 'done') return null;
+  const result = `${state.score} of ${state.length} right`;
+  if (state.score >= state.goal) return { title: 'Cleared!', detail: result, tone: 'win' };
+  return {
+    title: result,
+    detail: `You need ${state.goal}.`,
+    tone: 'over',
+    action: { label: 'Play again', kind: 'again' },
+  };
+}
+
+/** The Steer the Curve banner: the result once the targets are gone or the keeper is. */
+export function steerBanner(state: SteerState): Banner | null {
+  if (state === 'won')
+    return { title: 'Cleared!', detail: 'The red square vanished, and yours held.', tone: 'win' };
+  if (state === 'lost') {
+    return {
+      title: 'Your square vanished',
+      detail: 'It met another square, and the two folded away together.',
+      tone: 'over',
+      action: { label: 'Try again', kind: 'again' },
+    };
+  }
+  return null;
+}
+
+/** The Build a Curve banner, once the curve has the target count. */
+export function buildBanner(state: BuildCount): Banner | null {
+  return state.met
+    ? { title: 'Built!', detail: `Your curve has exactly ${state.count} squares.`, tone: 'win' }
+    : null;
 }

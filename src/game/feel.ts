@@ -8,3 +8,6 @@ export const TOLERANCE = 0.05;
 
 /** How long Avoid Folds gives the player to find another square after losing theirs, in milliseconds. */
 export const GRACE_MS = 3000;
+
+/** How far ahead Lifelines shows each square's time left, in real seconds. */
+export const LIFELINE_HORIZON = 6;

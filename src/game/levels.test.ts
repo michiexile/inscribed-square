@@ -2,7 +2,20 @@ import { describe, expect, it } from 'vitest';
 import { MorphingCurve } from '../geometry/morph';
 import { findSquares } from '../geometry/solver';
 import { GRACE_MS, TOLERANCE } from './feel';
-import { LEVELS, fitHuntSeed, levelCurve, nextLevel, parseRoute, randomLevel, routeOf } from './levels';
+import {
+  LEVELS,
+  fitHuntSeed,
+  isHeld,
+  levelCurve,
+  nextLevel,
+  parseRoute,
+  randomLevel,
+  routeOf,
+} from './levels';
+import { EditableCurve } from '../geometry/editable';
+import { buildCount } from './build';
+import { foldRound } from './predict';
+import { EditTracker, Steer } from './steer';
 import { foldTrace, foldsProblems, huntProblems } from './validate';
 
 const COUNT_WORDS: Record<string, number> = { Three: 3, Five: 5, Seven: 7, Nine: 9, Eleven: 11 };
@@ -26,12 +39,14 @@ describe('levels', () => {
   });
 
   it('has every mode, with distinct ids', () => {
-    expect(new Set(LEVELS.map((l) => l.mode))).toEqual(new Set(['hunt', 'folds', 'count']));
+    expect(new Set(LEVELS.map((l) => l.mode))).toEqual(
+      new Set(['hunt', 'folds', 'count', 'choice', 'predict', 'steer', 'build']),
+    );
     expect(new Set(LEVELS.map((l) => l.id)).size).toBe(LEVELS.length);
   });
 
-  it('gives every Avoid Folds level a fold within its first 20 seconds', () => {
-    for (const level of LEVELS.filter((l) => l.mode === 'folds')) {
+  it('gives every morphing level a fold within its first 20 seconds', () => {
+    for (const level of LEVELS.filter((l) => isHeld(l.mode))) {
       const morph = new MorphingCurve(level.seed!);
       const counts = new Set<number>();
       // Stop at the first change: one fold is all the test needs, and each full solve costs tens of milliseconds.
@@ -58,10 +73,10 @@ describe('levels', () => {
     }
   }, 60_000);
 
-  it("never strands a player in the first minute of an Avoid Folds level, at the level's own speed", () => {
+  it("never strands a player in the first minute of a morphing level, at the level's own speed", () => {
     // After every fold, some square is alive within the grace time and lives at least a second after it, both in
     // real seconds.
-    for (const level of LEVELS.filter((l) => l.mode === 'folds')) {
+    for (const level of LEVELS.filter((l) => isHeld(l.mode))) {
       const speed = level.speed ?? 1;
       const trace = foldTrace(new MorphingCurve(level.seed), 60 * speed, 0.5);
       expect(foldsProblems(trace, speed, GRACE_MS / 1000, 1), level.id!).toEqual([]);
@@ -109,10 +124,76 @@ describe('levels', () => {
   });
 
   it('gives every Avoid Folds level a goal, and asks for longer holds as the levels go on', () => {
-    const goals = LEVELS.filter((l) => l.mode === 'folds').map((l) => l.goal);
-    for (const g of goals) expect(g).toBeGreaterThan(0);
-    for (let i = 1; i < goals.length; i++) expect(goals[i]!).toBeGreaterThanOrEqual(goals[i - 1]!);
+    for (const mode of ['folds', 'choice'] as const) {
+      const goals = LEVELS.filter((l) => l.mode === mode).map((l) => l.goal);
+      expect(goals.length, mode).toBeGreaterThan(0);
+      for (const g of goals) expect(g, mode).toBeGreaterThan(0);
+      for (let i = 1; i < goals.length; i++) expect(goals[i]!, mode).toBeGreaterThanOrEqual(goals[i - 1]!);
+    }
     expect(randomLevel('folds', 3).goal).toBeUndefined();
+  });
+
+  it('keeps at least three squares alive on every Lifelines curve, so a fold always leaves a choice', () => {
+    for (const level of LEVELS.filter((l) => l.mode === 'choice')) {
+      const morph = new MorphingCurve(level.seed);
+      const speed = level.speed ?? 1;
+      for (let real = 0; real < 60; real += 2)
+        expect(findSquares(morph.at(real * speed)).length, `${level.id} at ${real} s`).toBeGreaterThanOrEqual(
+          3,
+        );
+    }
+  }, 60_000);
+
+  it('stores Fold Forecast rounds that are all real rounds, with a reachable goal', () => {
+    const levels = LEVELS.filter((l) => l.mode === 'predict');
+    expect(levels.length).toBeGreaterThan(0);
+    for (const level of levels) {
+      expect(level.rounds!.length, level.id!).toBeGreaterThanOrEqual(5);
+      expect(level.goal!, level.id!).toBeLessThanOrEqual(level.rounds!.length);
+      const morph = new MorphingCurve(level.seed);
+      for (const t of level.rounds!)
+        expect(foldRound(morph, t, level.warning!), `${level.id} at ${t}`).not.toBeNull();
+    }
+  }, 60_000);
+
+  it('asks Fold Forecast questions earlier, so harder, as the levels go on', () => {
+    const warnings = LEVELS.filter((l) => l.mode === 'predict').map((l) => l.warning!);
+    for (let i = 1; i < warnings.length; i++) expect(warnings[i]).toBeGreaterThan(warnings[i - 1]);
+  });
+
+  it('can clear every Steer the Curve level by its stored hint, and the hint is needed', () => {
+    const levels = LEVELS.filter((l) => l.mode === 'steer');
+    expect(levels.length).toBeGreaterThan(0);
+    for (const level of levels) {
+      const curve = EditableCurve.fromSeed(level.seed);
+      const squares = findSquares(curve.polygon());
+      const steer = new Steer(
+        level.keeper! + 1,
+        level.targets!.map((t) => t + 1),
+      );
+      const et = new EditTracker(curve, squares);
+      const { psi, delta, steps } = level.hint!;
+      for (let i = 0; i < steps && steer.state === 'playing'; i++) steer.update(et.push(psi, delta));
+      expect(steer.state, level.id!).toBe('won');
+    }
+  });
+
+  it('can clear every Build a Curve level by its stored hint, from a curve that starts off target', () => {
+    const levels = LEVELS.filter((l) => l.mode === 'build');
+    expect(levels.length).toBeGreaterThan(0);
+    for (const level of levels) {
+      let curve = EditableCurve.fromSeed(level.seed);
+      expect(findSquares(curve.polygon()).length, level.id!).not.toBe(level.goal);
+      const { psi, delta, steps } = level.hint!;
+      for (let i = 0; i < steps; i++) curve = curve.pushed(psi, delta);
+      const polygon = curve.polygon();
+      expect(buildCount(polygon, findSquares(polygon), level.goal!, TOLERANCE).met, level.id!).toBe(true);
+    }
+  });
+
+  it('plays an Avoid Folds level before the first Lifelines level, which adds a choice to it', () => {
+    const first = LEVELS.findIndex((l) => l.mode === 'choice');
+    expect(LEVELS.slice(0, first).some((l) => l.mode === 'folds')).toBe(true);
   });
 
   it('moves a random Square Hunt seed on to the next curve that passes validation', () => {

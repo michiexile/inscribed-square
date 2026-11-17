@@ -1,6 +1,7 @@
 import type { Banner } from '../game/banner';
 import type { Held } from '../game/control';
 import type { Polygon } from '../geometry/polygon';
+import type { Vec } from '../geometry/vec';
 import type { Renderer } from '../render';
 
 /** A running level in one game mode, driven by the app's frame loop. */
@@ -22,6 +23,15 @@ export interface GameMode {
   cleared(): boolean;
   /** A large message the player must not miss, or null. */
   banner(): Banner | null;
+  /** True for a mode played by tapping, not by holding a square: the app then draws no held square or thumbs. */
+  readonly tapOnly?: boolean;
+  /**
+   * For modes that use the finger directly instead of a held square: the point the first finger drives, in curve
+   * coordinates, or null when no finger is down. Called every frame before `advance`.
+   */
+  pointer?(p: Vec | null): void;
+  /** A tap at a point in layout pixels, for modes played by tapping. */
+  tap?(p: Vec, now: number): void;
   /** Odd One Out only: the player says they have found every square, at time `now` (milliseconds). */
   claim?(now: number): void;
   /** Starts the level over, after its banner's button is pressed. */

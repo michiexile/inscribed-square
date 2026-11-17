@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { countBanner, foldsBanner, huntBanner, introBanner } from './banner';
+import {
+  buildBanner,
+  countBanner,
+  foldsBanner,
+  huntBanner,
+  introBanner,
+  predictBanner,
+  steerBanner,
+} from './banner';
 
 describe('foldsBanner', () => {
   it('shows nothing while searching or holding', () => {
@@ -98,5 +106,96 @@ describe('introBanner for Odd One Out', () => {
     const b = introBanner('count', 'corners', undefined);
     expect(b.detail).toMatch(/That's all/);
     expect(b.detail).toMatch(/two thumbs/i);
+  });
+});
+
+describe('introBanner for Lifelines', () => {
+  it('says each square shows its time left, and names the goal and grace time', () => {
+    const b = introBanner('choice', 'centre', 30);
+    expect(b.detail).toMatch(/how long/i);
+    expect(b.detail).toMatch(/30 s/);
+    expect(b.detail).toMatch(/3 seconds/);
+    expect(b.detail).toMatch(/one finger/i);
+  });
+});
+
+describe('predictBanner', () => {
+  const state = (phase: 'asking' | 'answered' | 'done', right: boolean | null, score = 0) => ({
+    phase,
+    last: right === null ? null : { id: 1, right },
+    score,
+    length: 5,
+    goal: 4,
+  });
+
+  it('shows nothing while asking', () => {
+    expect(predictBanner(state('asking', null))).toBeNull();
+  });
+
+  it('says whether an answer was right while the fold plays out', () => {
+    expect(predictBanner(state('answered', true))).toMatchObject({ title: 'Right!', tone: 'win' });
+    expect(predictBanner(state('answered', false))).toMatchObject({ title: 'Not that one', tone: 'warn' });
+  });
+
+  it('clears with enough right, and offers another go without', () => {
+    expect(predictBanner(state('done', null, 4))).toMatchObject({
+      title: 'Cleared!',
+      detail: '4 of 5 right',
+    });
+    expect(predictBanner(state('done', null, 3))).toMatchObject({
+      title: '3 of 5 right',
+      detail: 'You need 4.',
+      action: { label: 'Play again', kind: 'again' },
+    });
+  });
+});
+
+describe('introBanner for Fold Forecast', () => {
+  it('asks for one of the pair, by tapping', () => {
+    const b = introBanner('predict', 'centre', undefined);
+    expect(b.detail).toMatch(/two of these squares/i);
+    expect(b.detail).toMatch(/tap/i);
+  });
+});
+
+describe('steerBanner', () => {
+  it('shows nothing while playing', () => {
+    expect(steerBanner('playing')).toBeNull();
+  });
+
+  it('celebrates a win, and explains a loss with a retry', () => {
+    expect(steerBanner('won')).toMatchObject({ title: 'Cleared!', tone: 'win' });
+    expect(steerBanner('lost')).toMatchObject({
+      tone: 'over',
+      action: { label: 'Try again', kind: 'again' },
+    });
+    expect(steerBanner('lost')?.detail).toMatch(/met another square/);
+  });
+});
+
+describe('introBanner for Steer the Curve', () => {
+  it('names the gold and red squares and says squares vanish in pairs', () => {
+    const b = introBanner('steer', 'centre', undefined);
+    expect(b.detail).toMatch(/gold/);
+    expect(b.detail).toMatch(/red/);
+    expect(b.detail).toMatch(/pairs/);
+  });
+});
+
+describe('buildBanner', () => {
+  it('celebrates only a met target', () => {
+    expect(buildBanner({ count: 5, settled: true, met: true })).toMatchObject({
+      title: 'Built!',
+      tone: 'win',
+    });
+    expect(buildBanner({ count: 5, settled: true, met: false })).toBeNull();
+  });
+});
+
+describe('introBanner for Build a Curve', () => {
+  it('names the target count and says lifting the finger counts', () => {
+    const b = introBanner('build', 'centre', 5);
+    expect(b.detail).toMatch(/exactly 5 squares/);
+    expect(b.detail).toMatch(/lift/i);
   });
 });
