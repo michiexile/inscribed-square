@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { radialFourier } from '../geometry/fourier';
 import { DEFAULT_CONTROL, HeldSquare } from './control';
+import { torusLayout } from './torus';
 
 const curve = radialFourier(
   [
@@ -46,5 +47,25 @@ describe('HeldSquare with drag the centre', () => {
     held.update(curve, 'centre', [{ x: 0, y: 0 }, null]);
     const c = centreOf(held.update(curve, 'centre', [{ x: 9, y: 9 }, null]));
     expect(Math.hypot(c.x, c.y)).toBeLessThan(2);
+  });
+});
+
+describe('HeldSquare with the torus controls', () => {
+  it('stands the square on the two nodes the pad moves, and reports where it is on the torus', () => {
+    const held = new HeldSquare();
+    const layout = torusLayout('pad', { x: 0, y: 520, width: 412, height: 380 });
+    held.updateTorus(curve, 'pad', [{ x: 100, y: 800 }, null], layout);
+    const h = held.updateTorus(curve, 'pad', [{ x: 100 + layout.map.size / 10, y: 800 }, null], layout)!;
+    expect(h.point).toEqual({ s: expect.closeTo(0.1, 5), t: expect.closeTo(0.5, 5) });
+    const nodes = [curve.point(0.1), curve.point(0.5)];
+    for (const n of nodes) expect(h.corners.some((c) => Math.hypot(c.x - n.x, c.y - n.y) < 1e-9)).toBe(true);
+    expect(h.free).toEqual([2, 3]);
+  });
+
+  it('reports a torus point for the drag controls too, from the nodes of the square held', () => {
+    const held = new HeldSquare();
+    const h = held.update(curve, 'corners', [curve.point(0.2), curve.point(0.45)])!;
+    expect(h.point!.s).toBeCloseTo(0.2, 3);
+    expect(h.point!.t).toBeCloseTo(0.45, 3);
   });
 });

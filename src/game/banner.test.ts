@@ -104,6 +104,13 @@ describe('countBanner', () => {
   });
 });
 
+describe('introBanner for the torus controls', () => {
+  it('explains the map for the pad and the dials for the dials', () => {
+    expect(introBanner('hunt', 'pad', undefined).detail).toMatch(/map/i);
+    expect(introBanner('hunt', 'dials', undefined).detail).toMatch(/dials/i);
+  });
+});
+
 describe('introBanner for Odd One Out', () => {
   it("names the That's all button and hides the count", () => {
     const b = introBanner('count', 'corners', undefined);

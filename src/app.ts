@@ -1,5 +1,6 @@
 import { type Banner, introBanner } from './game/banner';
-import { CONTROL_NAMES, type Control, DEFAULT_CONTROL, HeldSquare } from './game/control';
+import { CONTROLS, CONTROL_NAMES, type Control, DEFAULT_CONTROL, HeldSquare } from './game/control';
+import { type TorusLayout, type TorusPoint, torusLayout } from './game/torus';
 import { GRACE_MS, LIFELINE_HORIZON, TOLERANCE } from './game/feel';
 import {
   LEVELS,
@@ -24,7 +25,7 @@ import { PredictMode } from './modes/predictMode';
 import { SteerMode } from './modes/steerMode';
 import { BuildMode } from './modes/buildMode';
 import type { GameMode } from './modes/mode';
-import { Renderer } from './render';
+import { Renderer, THUMB_COLOURS } from './render';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game');
 const hud = document.querySelector<HTMLElement>('#hud');
@@ -203,6 +204,23 @@ function requestDraw(): void {
   });
 }
 
+/** The player's last point on the torus map, kept while no finger is down. */
+let mapPoint: TorusPoint = { s: 0, t: 0.5 };
+
+const near = (p: Vec, d: { x: number; y: number; radius: number }) =>
+  Math.hypot(p.x - d.x, p.y - d.y) <= 1.3 * d.radius;
+
+/** The torus map and dials, under the curve on a tall screen and beside it on a wide one. */
+function torusArea(curve: readonly Vec[], size: { width: number; height: number }): TorusLayout {
+  const bottom = Math.max(...curve.map((p) => p.y)) + 12;
+  const right = Math.max(...curve.map((p) => p.x)) + 12;
+  const below = { x: 0, y: bottom, width: size.width, height: size.height - bottom };
+  const beside = { x: right, y: barBottom, width: size.width - right, height: size.height - barBottom };
+  const a = torusLayout(control, below);
+  const b = torusLayout(control, beside);
+  return a.map.size >= b.map.size ? a : b;
+}
+
 function draw(now: number): void {
   if (!game) return;
   const { toScreen, toCurve } = view();
@@ -215,24 +233,43 @@ function draw(now: number): void {
   game.pointer?.(first ? toCurve(first) : null);
   game.advance(now);
   const curve = game.curve;
-  const held =
-    game.tapOnly || game.pointer
-      ? null
+  const size = { width: canvas!.clientWidth / scale, height: canvas!.clientHeight / scale };
+  const holds = !game.tapOnly && !direct;
+  const layout = holds ? torusArea(curve.vertices.map(toScreen), size) : null;
+  const held = !layout
+    ? null
+    : control === 'pad' || control === 'dials'
+      ? heldSquare.updateTorus(curve, control, ts, layout)
       : heldSquare.update(
           curve,
           control,
           grab.map((g) => (g ? toCurve(g) : null)),
         );
-  const r = new Renderer(ctx!, toScreen, TOLERANCE, {
-    width: canvas!.clientWidth / scale,
-    height: canvas!.clientHeight / scale,
-  });
+  if (held?.point) mapPoint = held.point;
+  const r = new Renderer(ctx!, toScreen, TOLERANCE, size);
+  if (layout) {
+    r.torusMap(layout.map, mapPoint, game.marks?.() ?? [], 'hsl(172, 75%, 48%)');
+    layout.dials.forEach((d, i) =>
+      r.dial(
+        d,
+        i === 0 ? mapPoint.s : mapPoint.t,
+        THUMB_COLOURS[i],
+        ts.some((t) => t && near(t, d)),
+      ),
+    );
+    if (control === 'pad' || control === 'dials')
+      [mapPoint.s, mapPoint.t].forEach((p, i) => r.dot(toScreen(curve.point(p)), 7, THUMB_COLOURS[i]));
+  }
   const animate = game.frame(r, held, now, reveal);
   if (!game.tapOnly)
     ts.forEach((t, i) => {
       if (!t) return;
       const g = grab[i]!;
-      if (control === 'corners' && !direct) r.thumb(t, i, toScreen(curve.nearest(toCurve(g)).point));
+      if (control === 'dials' && !direct) r.thumb(t, i, t);
+      else if (control === 'pad' && !direct && layout) {
+        const m = layout.map;
+        r.thumb(t, 0, { x: m.x + mapPoint.s * m.size, y: m.y + (1 - mapPoint.t) * m.size });
+      } else if (control === 'corners' && !direct) r.thumb(t, i, toScreen(curve.nearest(toCurve(g)).point));
       else if (t === (ts[0] ?? ts[1]))
         // Drag the centre moves the square like a trackpad: tie the finger to the square it moves.
         r.thumb(
@@ -336,7 +373,7 @@ for (const type of ['pointerup', 'pointercancel'] as const) {
 
 levelsButton.addEventListener('click', showMenu);
 controlButton.addEventListener('click', () => {
-  control = control === 'corners' ? 'centre' : 'corners';
+  control = CONTROLS[(CONTROLS.indexOf(control) + 1) % CONTROLS.length];
   progress.setControl(control);
   controlButton.textContent = CONTROL_NAMES[control];
   heldSquare.reset();

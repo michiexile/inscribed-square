@@ -1,6 +1,7 @@
 import { type Banner, CLAIM_MESSAGE_MS, countBanner, huntBanner } from '../game/banner';
 import type { Held } from '../game/control';
 import { Claims } from '../game/count';
+import { type TorusPoint, torusPoints } from '../game/torus';
 import { type Hold, Hunt } from '../game/hunt';
 import type { Polygon } from '../geometry/polygon';
 import { findSquares } from '../geometry/solver';
@@ -40,6 +41,10 @@ export class HuntMode implements GameMode {
   }
 
   advance(): void {}
+
+  marks(): readonly TorusPoint[] {
+    return this.hunt.found.flatMap(torusPoints);
+  }
 
   frame(r: Renderer, held: Held | null, now: number, reveal: boolean): boolean {
     this.now = now;

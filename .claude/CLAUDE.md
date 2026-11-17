@@ -64,7 +64,9 @@ https://claude.ai/artifact/CqdHHDvThUbNKJiYkcmq2t, partly superseded).
   visit with no progress starts at `LEVELS[0]`); Avoid Folds levels clear at their `goal` seconds held in one round.
   Progress (cleared levels, seen intros) lives in `src/game/progress.ts` and must survive blocked or junk storage. Mode rules live in DOM-free classes in `src/game/` (`hunt.ts`,
   `folds.ts`); feel constants are guesses tracked in #5 and #12 (those the validator needs live in `src/game/feel.ts`).
-- `src/geometry/square.ts` (control 1) and `centre.ts` (control 2) build the held square; drag the centre works like a trackpad (`HeldSquare`
+- `src/geometry/square.ts` (control 1) and `centre.ts` (control 2) build the held square, and so do the torus pad and
+  dials (`src/game/torus.ts`: two nodes on the curve as a point on the (s, t) torus map, drawn for every holding
+  control; project lead 2026-11-17: build every control idea, prune later); drag the centre works like a trackpad (`HeldSquare`
   moves the square by the finger's motion, so the finger can stay below the curve, which `curveCentreY` lifts on tall
   screens) and is the
   default (`DEFAULT_CONTROL`, project lead, 2026-11-15) and the player's choice is saved in `Progress`; `src/game/hunt.ts` counts a

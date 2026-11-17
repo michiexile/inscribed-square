@@ -64,10 +64,7 @@ export function huntBanner(found: number, total: number): Banner | null {
  * has one.
  */
 export function introBanner(mode: ModeId, control: Control, goal: number | undefined): Banner {
-  const hold =
-    control === 'corners'
-      ? 'Put two thumbs on the screen: each one slides a corner of a square along the curve.'
-      : 'Drag one finger anywhere on the screen to move a square, like on a trackpad; it fits itself to the curve.';
+  const hold = HOLD[control];
   if (mode === 'build') {
     return {
       title: 'Build a curve',
@@ -133,6 +130,19 @@ export function introBanner(mode: ModeId, control: Control, goal: number | undef
     tone: 'info',
   };
 }
+
+/** How each control holds a square, for the intros. */
+const HOLD: Record<Control, string> = {
+  corners: 'Put two thumbs on the screen: each one slides a corner of a square along the curve.',
+  centre:
+    'Drag one finger anywhere on the screen to move a square, like on a trackpad; it fits itself to the curve.',
+  pad:
+    'Slide one finger anywhere: it moves the white dot on the map below. Its two coordinates are two points on ' +
+    'the curve, and a square stands on those two points.',
+  dials:
+    'Turn the two dials below, one at a time or both at once: each moves one point along the curve, and a square ' +
+    'stands on the two points.',
+};
 
 /** How long the message after a wrong claim stays up, in milliseconds. */
 export const CLAIM_MESSAGE_MS = 3000;
