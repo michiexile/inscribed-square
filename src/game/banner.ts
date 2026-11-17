@@ -90,8 +90,8 @@ export function introBanner(mode: ModeId, control: Control, goal: number | undef
     return {
       title: 'Which two fold?',
       detail:
-        'Two of these squares are about to meet and vanish together. Tap the letter of one of them, then watch the ' +
-        'curve move on and see if you were right.',
+        'Two of these squares are about to meet and vanish together: watch them move, and look for two that are ' +
+        'closing in on each other. Tap the card of one of them, then see if you were right.',
       tone: 'info',
     };
   }

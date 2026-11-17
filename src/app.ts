@@ -223,7 +223,10 @@ function draw(now: number): void {
           control,
           grab.map((g) => (g ? toCurve(g) : null)),
         );
-  const r = new Renderer(ctx!, toScreen, TOLERANCE);
+  const r = new Renderer(ctx!, toScreen, TOLERANCE, {
+    width: canvas!.clientWidth / scale,
+    height: canvas!.clientHeight / scale,
+  });
   const animate = game.frame(r, held, now, reveal);
   if (!game.tapOnly)
     ts.forEach((t, i) => {

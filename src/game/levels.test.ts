@@ -14,7 +14,8 @@ import {
 } from './levels';
 import { EditableCurve } from '../geometry/editable';
 import { buildCount } from './build';
-import { foldRound } from './predict';
+import { FORECAST_PREVIEW } from './feel';
+import { foldRound, lookBack } from './predict';
 import { EditTracker, Steer } from './steer';
 import { foldTrace, foldsProblems, huntProblems } from './validate';
 
@@ -153,6 +154,23 @@ describe('levels', () => {
       const morph = new MorphingCurve(level.seed);
       for (const t of level.rounds!)
         expect(foldRound(morph, t, level.warning!), `${level.id} at ${t}`).not.toBeNull();
+    }
+  }, 60_000);
+
+  it('shows the folding pair closing in during the motion before every Fold Forecast question', () => {
+    // The motion is the cue: if the pair drifted apart while it played, the question would be a pure guess.
+    for (const level of LEVELS.filter((l) => l.mode === 'predict')) {
+      const morph = new MorphingCurve(level.seed);
+      for (const t of level.rounds!) {
+        const round = foldRound(morph, t, level.warning!)!;
+        const frames = lookBack(morph, round, FORECAST_PREVIEW);
+        const gap = (f: (typeof frames)[number]) => {
+          const [a, b] = round.dying.map((id) => f.squares.get(id));
+          if (!a || !b) return Infinity;
+          return Math.max(...a.map((p) => Math.min(...b.map((q) => Math.hypot(p.x - q.x, p.y - q.y)))));
+        };
+        expect(gap(frames.at(-1)!), `${level.id} at ${t}`).toBeLessThan(gap(frames[0]));
+      }
     }
   }, 60_000);
 

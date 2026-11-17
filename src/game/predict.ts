@@ -1,6 +1,7 @@
 import type { MorphingCurve } from '../geometry/morph';
 import { rng } from '../geometry/random';
 import { findSquares } from '../geometry/solver';
+import type { Corners } from '../geometry/square';
 import { SquareTracker, type TrackedSquare } from '../geometry/tracker';
 
 /** A Predict round: the curve frozen at `time`, its squares, and the pair that folds away first, at `foldAt`. */
@@ -31,6 +32,36 @@ export function foldRound(morph: MorphingCurve, time: number, warning: number, m
     return { time, squares: start, dying: died.map((d) => d.id), foldAt: t };
   }
   return null;
+}
+
+/** The squares of a round at one moment before it, by the round's square ids. */
+export interface PastFrame {
+  readonly time: number;
+  readonly squares: ReadonlyMap<number, Corners>;
+}
+
+/**
+ * The round's squares over the `seconds` before it, a frame per 1/60 s, oldest first and ending at the round itself:
+ * each square is tracked backward from the round, so a square born in that time is missing before its birth.
+ */
+export function lookBack(morph: MorphingCurve, round: Round, seconds: number): PastFrame[] {
+  const tracker = new SquareTracker(
+    (back) => morph.at(round.time - back),
+    0,
+    round.squares.map((q) => q.square),
+  );
+  // The tracker numbers squares from 1 in the order given, the same order as the round's squares.
+  const frame = (back: number): PastFrame => ({
+    time: round.time - back,
+    squares: new Map(tracker.squares.map((q) => [round.squares[q.id - 1].id, q.square.corners])),
+  });
+  const frames = [frame(0)];
+  const steps = Math.round(seconds / FRAME);
+  for (let k = 1; k <= steps; k++) {
+    tracker.advance(k * FRAME);
+    frames.push(frame(k * FRAME));
+  }
+  return frames.reverse();
 }
 
 /**

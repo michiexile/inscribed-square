@@ -54,8 +54,9 @@ https://claude.ai/artifact/CqdHHDvThUbNKJiYkcmq2t, partly superseded).
   right claim, `src/game/count.ts`; its messages never reveal the count before then; and Lifelines, which is `FoldsMode`
   with a horizon: `LeadTracker` (`src/geometry/lookahead.ts`) runs the tracker that far ahead of the display so each
   square's death time is known, and full solves for it are made at its `aheadTime`; and Fold Forecast, `PredictMode`,
-  played by tapping (`GameMode.tapOnly`), whose rounds come from `foldRound` in `src/game/predict.ts` and are stored as
-  morph times in campaign levels; and Steer the Curve, `SteerMode`, which takes the finger directly (`GameMode.pointer`):
+  played by tapping (`GameMode.tapOnly`) on one card per square (`src/game/cards.ts`), whose rounds come from `foldRound`
+  in `src/game/predict.ts` and are stored as morph times in campaign levels; before each question it loops
+  `FORECAST_PREVIEW` seconds of motion (`lookBack`), and `levels.test.ts` checks the folding pair closes in during it; and Steer the Curve, `SteerMode`, which takes the finger directly (`GameMode.pointer`):
   `EditableCurve` (`src/geometry/editable.ts`) is pushed toward it, `EditTracker` splits each push into steps of at most
   `PUSH_STEP` for the tracker, and every campaign level stores a push `hint` that `levels.test.ts` proves clears it; and Build a Curve, `BuildMode`,
   the same pull with a target count from `buildCount` (`src/game/build.ts`): a worker (`countWorker.ts`) counts while

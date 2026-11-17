@@ -11,7 +11,26 @@ export class Renderer {
     readonly toScreen: (p: Vec) => Vec,
     /** Corner distance below which a corner shows as on the curve (green). */
     readonly tolerance: number,
+    /** The canvas size in layout pixels. */
+    readonly size: { readonly width: number; readonly height: number } = { width: 0, height: 0 },
   ) {}
+
+  /** The same canvas with another mapping from curve coordinates, such as into a card. */
+  within(toScreen: (p: Vec) => Vec): Renderer {
+    return new Renderer(this.ctx, toScreen, this.tolerance, this.size);
+  }
+
+  /** A card's background and border, in layout pixels. */
+  panel(x: number, y: number, size: number, border: string, width: number): void {
+    const ctx = this.ctx;
+    ctx.beginPath();
+    ctx.roundRect(x, y, size, size, 10);
+    ctx.fillStyle = '#161d23';
+    ctx.fill();
+    ctx.strokeStyle = border;
+    ctx.lineWidth = width;
+    ctx.stroke();
+  }
 
   /** Green within tolerance, through yellow, to red at eight times the tolerance. */
   closeness(d: number): string {
@@ -38,10 +57,10 @@ export class Renderer {
     this.ctx.fill();
   }
 
-  curve(vertices: readonly Vec[]): void {
+  curve(vertices: readonly Vec[], colour = '#e0e6eb', width = 2): void {
     this.path(vertices);
-    this.ctx.strokeStyle = '#e0e6eb';
-    this.ctx.lineWidth = 2;
+    this.ctx.strokeStyle = colour;
+    this.ctx.lineWidth = width;
     this.ctx.stroke();
   }
 
