@@ -1,7 +1,15 @@
 import { type Banner, predictBanner } from '../game/banner';
 import { type Card, cardLayout } from '../game/cards';
 import { FORECAST_PREVIEW } from '../game/feel';
-import { type PastFrame, PredictGame, type Round, foldRound, lookBack, roundSearch } from '../game/predict';
+import {
+  CardPress,
+  type PastFrame,
+  PredictGame,
+  type Round,
+  foldRound,
+  lookBack,
+  roundSearch,
+} from '../game/predict';
 import type { Corners } from '../geometry/square';
 import { CURVE_SPAN } from '../input/scale';
 import { MorphingCurve } from '../geometry/morph';
@@ -19,6 +27,8 @@ const RANDOM_WARNING = 2;
 const LINGER_MS = 1500;
 /** The loop pauses this long on the round itself, in real seconds. */
 const PREVIEW_HOLD = 1;
+/** How long a card must be held to choose it, in milliseconds; a shorter press only shows its square. */
+const PRESS_MS = 700;
 /** The fold plays at this fraction of real time, so the pair can be watched closing in. */
 const REPLAY_SPEED = 0.5;
 /** How long the flash where the pair vanished lasts, in milliseconds. */
@@ -61,6 +71,9 @@ export class PredictMode implements GameMode {
   private asking: Asking | null = null;
   private playback: Playback | null = null;
   private cards: { id: number; card: Card }[] = [];
+  private readonly press = new CardPress(PRESS_MS);
+  /** True once a card has been pressed, so the intro gets out of the way of the curve. */
+  private touched = false;
 
   constructor(
     readonly seed: number,
@@ -114,13 +127,33 @@ export class PredictMode implements GameMode {
     const frame = frames[Math.min(frames.length - 1, Math.round(into * (frames.length - 1)))];
     this.curve = this.morph.at(frame.time);
     r.curve(this.curve.vertices);
-    r.ctx.globalAlpha = 0.5;
-    for (const [id, corners] of frame.squares) r.outline(corners, this.colourOf(round, id), 1.5);
+    const chosen = this.press.update(now);
+    if (chosen !== null) {
+      this.game.answer(chosen);
+      navigator.vibrate?.(this.game.last?.right ? 40 : [30, 40, 30]);
+      return true;
+    }
+    // While a card is held, its square stands out on the curve and the rest fade, so a press reads as choosing.
+    const held = this.press.held;
+    for (const [id, corners] of frame.squares) {
+      const mine = held?.id === id;
+      r.ctx.globalAlpha = held ? (mine ? 1 : 0.15) : 0.5;
+      if (mine) r.fill(corners, 'rgba(255, 255, 255, 0.08)');
+      r.outline(corners, this.colourOf(round, id), mine ? 4 : 1.5);
+    }
     r.ctx.globalAlpha = 1;
     this.layoutCards(r, round);
     for (const { id, card } of this.cards) {
       const corners = frame.squares.get(id);
-      this.drawCard(r, card, round, id, corners ?? null, this.colourOf(round, id), 2);
+      const mine = held?.id === id;
+      this.drawCard(r, card, round, id, corners ?? null, this.colourOf(round, id), mine ? 4 : 2);
+      if (mine)
+        r.ring(
+          { x: card.x + card.size / 2, y: card.y + card.size / 2 },
+          card.size / 3,
+          held!.progress,
+          '#ffffff',
+        );
     }
     return true;
   }
@@ -235,14 +268,14 @@ export class PredictMode implements GameMode {
     return true;
   }
 
-  tap(p: Vec): void {
+  tap(p: Vec, now: number): void {
     if (this.game.phase !== 'asking') return;
     const hit = this.cards.find(
       ({ card }) => p.x >= card.x && p.x <= card.x + card.size && p.y >= card.y && p.y <= card.y + card.size,
     );
     if (!hit) return;
-    this.game.answer(hit.id);
-    navigator.vibrate?.(this.game.last?.right ? 40 : [30, 40, 30]);
+    this.touched = true;
+    this.press.down(hit.id, now);
   }
 
   hud(): string {
@@ -251,7 +284,7 @@ export class PredictMode implements GameMode {
   }
 
   started(): boolean {
-    return this.game.index > 0 || this.game.phase !== 'asking';
+    return this.touched || this.game.index > 0 || this.game.phase !== 'asking';
   }
 
   cleared(): boolean {
@@ -266,9 +299,12 @@ export class PredictMode implements GameMode {
     this.game = this.newGame();
     this.asking = null;
     this.playback = null;
+    this.press.up();
   }
 
-  released(): void {}
+  released(): void {
+    this.press.up();
+  }
 
   dispose(): void {}
 }

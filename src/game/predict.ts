@@ -136,3 +136,36 @@ export function roundSearch(morph: MorphingCurve, warning: number, seed: number)
     }
   };
 }
+
+/**
+ * Choosing a card by holding it: a press commits only after `ms` milliseconds on the same card, so the player can
+ * look at a card, and see its square on the curve, without answering.
+ */
+export class CardPress {
+  private pressing: { id: number; since: number; progress: number } | null = null;
+
+  constructor(readonly ms: number) {}
+
+  /** The card being held and how far through the press it is, 0 to 1; null when none is. */
+  get held(): { readonly id: number; readonly progress: number } | null {
+    return this.pressing && { id: this.pressing.id, progress: this.pressing.progress };
+  }
+
+  down(id: number, now: number): void {
+    this.pressing = { id, since: now, progress: 0 };
+  }
+
+  up(): void {
+    this.pressing = null;
+  }
+
+  /** Advances the press to `now`; returns the card's id at the moment it commits, else null. */
+  update(now: number): number | null {
+    const p = this.pressing;
+    if (!p) return null;
+    p.progress = Math.min(1, (now - p.since) / this.ms);
+    if (p.progress < 1) return null;
+    this.pressing = null;
+    return p.id;
+  }
+}

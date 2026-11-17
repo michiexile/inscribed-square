@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MorphingCurve } from '../geometry/morph';
-import { PredictGame, type Round, foldRound, lookBack, roundSearch } from './predict';
+import { CardPress, PredictGame, type Round, foldRound, lookBack, roundSearch } from './predict';
 
 // Morph seed 1 (tracker.test.ts): 7 squares at 15 s, a pair folds away between 16 s and 16.25 s, and no square dies
 // between 9 s and 14 s.
@@ -126,5 +126,33 @@ describe('roundSearch', () => {
     expect(rounds.map((r) => r.time)).toEqual([b(), b(), b()].map((r) => r.time));
     for (let i = 1; i < rounds.length; i++) expect(rounds[i].time).toBeGreaterThan(rounds[i - 1].time);
     for (const r of rounds) expect(foldRound(morph, r.time, 1.5)).not.toBeNull();
+  });
+});
+
+describe('CardPress', () => {
+  it('commits a card held for the whole press time, once', () => {
+    const press = new CardPress(600);
+    press.down(3, 1000);
+    expect(press.update(1300)).toBeNull();
+    expect(press.held).toEqual({ id: 3, progress: 0.5 });
+    expect(press.update(1600)).toBe(3);
+    expect(press.update(1700)).toBeNull();
+    expect(press.held).toBeNull();
+  });
+
+  it('commits nothing when the finger lifts early, so looking at a card is free', () => {
+    const press = new CardPress(600);
+    press.down(3, 1000);
+    press.up();
+    expect(press.update(2000)).toBeNull();
+    expect(press.held).toBeNull();
+  });
+
+  it('starts over when the finger lands on another card', () => {
+    const press = new CardPress(600);
+    press.down(3, 1000);
+    press.down(4, 1500);
+    expect(press.update(1700)).toBeNull();
+    expect(press.update(2100)).toBe(4);
   });
 });

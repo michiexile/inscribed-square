@@ -157,7 +157,7 @@ describe('introBanner for Fold Forecast', () => {
   it('asks for one of the pair, by tapping', () => {
     const b = introBanner('predict', 'centre', undefined);
     expect(b.detail).toMatch(/two of these squares/i);
-    expect(b.detail).toMatch(/tap the card/i);
+    expect(b.detail).toMatch(/hold the card/i);
     expect(b.detail).toMatch(/closing in/i);
   });
 });
